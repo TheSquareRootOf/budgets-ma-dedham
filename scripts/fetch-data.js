@@ -20,13 +20,25 @@ function categorizeDepartment(rawName) {
   return 'General Government'; 
 }
 
+// NEW: Sequential fetching to prevent server crash (ECONNRESET)
 async function fetchSocrata(datasetId, limit, chunks) {
-  const offsets = Array.from({length: chunks}, (_, i) => i * limit);
-  const fetchPromises = offsets.map(offset => 
-    fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`).then(res => res.json())
-  );
-  const results = await Promise.all(fetchPromises);
-  return results.flat();
+  const results = [];
+  for (let i = 0; i < chunks; i++) {
+    const offset = i * limit;
+    console.log(`  - Fetching chunk ${i + 1}/${chunks} for ${datasetId}...`);
+    
+    const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`);
+    const data = await response.json();
+    
+    // If the API returns fewer rows than the limit, we've hit the end of the town's historical data early
+    if (data.length === 0) break;
+    
+    results.push(...data);
+    
+    // A polite 500ms delay between requests to keep the town's server happy
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  return results;
 }
 
 async function runPipeline() {
@@ -41,7 +53,7 @@ async function runPipeline() {
     const charDesc = (row.charactercodedescription || '').toLowerCase();
     const desc = (row.accountdescription || row.description || row.object || '').toLowerCase();
     return {
-      id: i, // Use integer instead of 36-char UUID to save space
+      id: i,
       fiscalYear: row.fiscalyear || '2027',
       department: categorizeDepartment(row.department || row.organization || row.functiongroup),
       description: row.accountdescription || row.description || row.object || 'Uncategorized Expense',
@@ -53,9 +65,9 @@ async function runPipeline() {
   });
   fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
 
-  // 2. Payroll (Capped at 300k rows, dropped massive metadata fields)
-  console.log('Fetching Payroll...');
-  const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 6); 
+  // 2. Payroll (Back to 500,000 rows!)
+  console.log('Fetching Payroll (500k limit)...');
+  const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); 
   const payroll = rawPayroll.map((row, i) => ({
     id: i, 
     fiscalYear: row.fiscalyear || '2027',
@@ -66,7 +78,7 @@ async function runPipeline() {
     overtime: parseFloat(row.overtimepay || 0),
     otherPay: parseFloat(row.otherpay || row.other_pay || 0), 
     total: parseFloat(row.totalpay || 0),
-    date: (row.transactiondate || row.checkdate || row.date || '').split('T')[0] // Drop the timestamp to save space
+    date: (row.transactiondate || row.checkdate || row.date || '').split('T')[0]
   }));
   fs.writeFileSync(path.join(dataDir, 'payroll.json'), JSON.stringify(payroll));
 
@@ -82,9 +94,9 @@ async function runPipeline() {
   }));
   fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
 
-  // 4. Checks (Capped at 250k rows)
-  console.log('Fetching Checkbook...');
-  const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 5); 
+  // 4. Checks (Back to 500,000 rows!)
+  console.log('Fetching Checkbook (500k limit)...');
+  const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 10); 
   const checks = rawChecks.map((item, i) => ({
     id: i,
     fiscalYear: item.fiscalyear || '2027',
