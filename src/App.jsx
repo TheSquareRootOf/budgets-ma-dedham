@@ -350,11 +350,11 @@ export default function App() {
             </div>
 
             <div className="flex flex-col sm:flex-row w-full gap-3">
-              <div className="relative flex-1 max-w-2xl">
+              <div className="relative flex-1 max-w-3xl">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text"
-                  placeholder="Search here! A name of a teacher, officer, or staff, a vendor, by spend description, etc."
+                  placeholder="Search by: Name (teacher, officer, staff, vendor), by Category (safety), by Description (street, road), by Check Number, etc."
                   value={globalSearch}
                   onChange={(e) => { setGlobalSearch(e.target.value); resetFilters(); }}
                   className="w-full pl-10 pr-10 py-2.5 sm:py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
