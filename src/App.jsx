@@ -82,6 +82,7 @@ export default function App() {
 
   const handleYearChange = (year) => {
     setSelectedYear(year);
+    setGlobalSearch('');
     resetFilters();
   };
 
@@ -92,7 +93,6 @@ export default function App() {
     setSelectedEmployee(null);
     setBudgetTableSearch('');
     setPayrollTableSearch('');
-    // Auto-scroll back to the top of the dashboard on mobile
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -186,7 +186,6 @@ export default function App() {
     return acc;
   }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
 
-  // --- Budget Table Logic ---
   const categoryBudgetItems = (selectedCategory && selectedDonut === 'budget') ? nonPayrollBudget.filter(r => r.department === selectedCategory) : [];
   const tableSearchLower = budgetTableSearch.toLowerCase();
   const filteredCategoryItems = categoryBudgetItems.filter(row => !budgetTableSearch || row.description.toLowerCase().includes(tableSearchLower));
@@ -210,7 +209,6 @@ export default function App() {
   const totalBudgetPages = Math.ceil(sortedBudgetTable.length / budgetPageSize);
   const paginatedBudgetTable = sortedBudgetTable.slice((budgetPage - 1) * budgetPageSize, budgetPage * budgetPageSize);
 
-  // --- Grouped Payroll Table Logic ---
   const categoryPayrollItems = (selectedCategory && selectedDonut === 'payroll') ? searchFilteredPayroll.filter(r => r.department === selectedCategory) : [];
   const payrollSearchLower = payrollTableSearch.toLowerCase();
   
@@ -235,7 +233,6 @@ export default function App() {
   const totalPayrollPages = Math.ceil(sortedPayrollTable.length / payrollPageSize);
   const paginatedPayrollTable = sortedPayrollTable.slice((payrollPage - 1) * payrollPageSize, payrollPage * payrollPageSize);
 
-  // --- Employee Pay History Chart Logic ---
   let employeeChartData = [];
   if (selectedEmployee) {
     let employeeHistory = rawPayroll.filter(r => r.name === selectedEmployee.name);
@@ -267,7 +264,6 @@ export default function App() {
     employeeChartData = Object.values(payByYear).sort((a, b) => a.fiscalYear.localeCompare(b.fiscalYear));
   }
 
-  // --- Vendor Check Logic ---
   const accountChecks = (selectedAccount && selectedDonut === 'budget') ? currentCheckbook.filter(c => {
     if (!selectedAccount.spend || selectedAccount.spend === 0) return false;
     if (c.department !== selectedCategory) return false;
@@ -358,7 +354,7 @@ export default function App() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text"
-                  placeholder="Search name, category, vendor..."
+                  placeholder="Search anything! Names of town staff or teachers, vendor names, or spend categories"
                   value={globalSearch}
                   onChange={(e) => { setGlobalSearch(e.target.value); resetFilters(); }}
                   className="w-full pl-10 pr-10 py-2.5 sm:py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
@@ -370,9 +366,9 @@ export default function App() {
                 )}
               </div>
               
-              {/* Desktop Clear Filters Button */}
-              {(selectedCategory || selectedAccount || selectedEmployee) && (
-                <button onClick={resetFilters} className="hidden lg:flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
+              {/* Universal Clear Filters Button */}
+              {(selectedCategory || selectedAccount || selectedEmployee || globalSearch) && (
+                <button onClick={() => { setGlobalSearch(''); resetFilters(); }} className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
                   <FilterX className="w-4 h-4" /> Clear Filters
                 </button>
               )}
@@ -396,7 +392,6 @@ export default function App() {
 
         <div className="flex flex-col xl:flex-row gap-6 sm:gap-8">
           
-          {/* Mobile Horizontal Breadcrumbs */}
           <div className="xl:hidden w-full overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
             <div className="flex items-center gap-2 min-w-max">
               {breadcrumbs.map((bc, i) => (
@@ -411,7 +406,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Desktop Vertical Breadcrumbs */}
           <div className="hidden xl:block w-48 shrink-0">
             <div className="sticky top-8 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Navigation</h3>
@@ -432,10 +426,9 @@ export default function App() {
 
           <div className="flex-1 space-y-6 sm:space-y-8 w-full overflow-hidden">
             
-            {/* Mobile-Only "Reset View" Button (Appears above the isolated donut) */}
             {selectedDonut && (
                <div className="lg:hidden animate-in fade-in slide-in-from-top-2">
-                 <button onClick={resetFilters} className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white p-3 rounded-xl shadow-md active:bg-slate-700 font-medium transition-colors">
+                 <button onClick={() => { setGlobalSearch(''); resetFilters(); }} className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white p-3 rounded-xl shadow-md active:bg-slate-700 font-medium transition-colors">
                    <X className="w-5 h-5" /> Reset View & Show All Charts
                  </button>
                </div>
@@ -450,7 +443,6 @@ export default function App() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               
-              {/* BUDGET DONUT CARD */}
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'budget' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 text-center">Funds Spent by Category</h2>
                 <p className="text-xs sm:text-sm text-slate-500 mb-4 text-center">(Excluding Payroll)</p>
@@ -485,7 +477,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* PAYROLL DONUT CARD */}
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'payroll' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Payroll Spent by Category</h2>
                 <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
@@ -519,7 +510,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* PROJECTS DONUT CARD */}
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'projects' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Major Expenditures</h2>
                 <div className="h-48 sm:h-56 w-full opacity-60 touch-pan-y">
@@ -564,7 +554,6 @@ export default function App() {
               </div>
             )}
 
-            {/* BUDGET TABLE */}
             {(selectedCategory && selectedDonut === 'budget') && (
               <div id="budget-table" className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className={`flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 ${selectedAccount ? 'hidden lg:flex' : 'flex'}`}>
@@ -621,7 +610,6 @@ export default function App() {
                             );
                           })}
                           
-                          {/* Mobile-Only Close Row Button */}
                           {selectedAccount && (
                             <tr className="lg:hidden bg-blue-50 border-t border-blue-100 animate-in fade-in">
                               <td colSpan="4" className="p-0">
@@ -647,7 +635,6 @@ export default function App() {
               </div>
             )}
 
-            {/* PAYROLL TABLE */}
             {(selectedCategory && selectedDonut === 'payroll') && (
               <div id="payroll-table" className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className={`flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 ${selectedEmployee ? 'hidden lg:flex' : 'flex'}`}>
@@ -707,7 +694,6 @@ export default function App() {
                             );
                           })}
                           
-                          {/* Mobile-Only Close Row Button */}
                           {selectedEmployee && (
                             <tr className="lg:hidden bg-indigo-50 border-t border-indigo-100 animate-in fade-in">
                               <td colSpan="6" className="p-0">
@@ -733,7 +719,6 @@ export default function App() {
               </div>
             )}
 
-            {/* EMPLOYEE CHART */}
             {selectedEmployee && (
               <div id="employee-chart" className="bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-700 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-700 pb-4">
@@ -787,7 +772,6 @@ export default function App() {
               </div>
             )}
 
-            {/* VENDOR CHECKS TABLE */}
             {(selectedAccount && selectedDonut === 'budget') && (
               <div id="vendor-table" className="bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-700 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-700 pb-4">
