@@ -92,6 +92,8 @@ export default function App() {
     setSelectedEmployee(null);
     setBudgetTableSearch('');
     setPayrollTableSearch('');
+    // Auto-scroll back to the top of the dashboard on mobile
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const scrollToSection = (id) => {
@@ -368,8 +370,9 @@ export default function App() {
                 )}
               </div>
               
+              {/* Desktop Clear Filters Button */}
               {(selectedCategory || selectedAccount || selectedEmployee) && (
-                <button onClick={resetFilters} className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
+                <button onClick={resetFilters} className="hidden lg:flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
                   <FilterX className="w-4 h-4" /> Clear Filters
                 </button>
               )}
@@ -429,6 +432,15 @@ export default function App() {
 
           <div className="flex-1 space-y-6 sm:space-y-8 w-full overflow-hidden">
             
+            {/* Mobile-Only "Reset View" Button (Appears above the isolated donut) */}
+            {selectedDonut && (
+               <div className="lg:hidden animate-in fade-in slide-in-from-top-2">
+                 <button onClick={resetFilters} className="w-full flex items-center justify-center gap-2 bg-slate-800 text-white p-3 rounded-xl shadow-md active:bg-slate-700 font-medium transition-colors">
+                   <X className="w-5 h-5" /> Reset View & Show All Charts
+                 </button>
+               </div>
+            )}
+
             {!selectedCategory && (
               <div className="p-6 sm:p-8 bg-blue-50 border border-blue-100 rounded-2xl text-center shadow-inner animate-in fade-in duration-500">
                 <h2 className="text-xl sm:text-3xl font-bold text-blue-600 mb-2">Welcome to Dedham Dollars</h2>
@@ -437,8 +449,9 @@ export default function App() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              
               {/* BUDGET DONUT CARD */}
-              <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all hover:shadow-md flex flex-col items-center ${selectedDonut === 'budget' ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-200'}`}>
+              <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'budget' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 text-center">Funds Spent by Category</h2>
                 <p className="text-xs sm:text-sm text-slate-500 mb-4 text-center">(Excluding Payroll)</p>
                 <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
@@ -451,7 +464,6 @@ export default function App() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Mobile-Only Easy Tap List */}
                 <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {top10Budget.slice(0, 5).map((entry, index) => {
@@ -474,7 +486,7 @@ export default function App() {
               </div>
 
               {/* PAYROLL DONUT CARD */}
-              <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all hover:shadow-md flex flex-col items-center ${selectedDonut === 'payroll' ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-200'}`}>
+              <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'payroll' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Payroll Spent by Category</h2>
                 <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
                   <ResponsiveContainer width="100%" height="100%">
@@ -486,7 +498,6 @@ export default function App() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Mobile-Only Easy Tap List */}
                 <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {payrollDonutData.slice(0, 5).map((entry, index) => {
@@ -509,7 +520,7 @@ export default function App() {
               </div>
 
               {/* PROJECTS DONUT CARD */}
-              <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all hover:shadow-md flex flex-col items-center ${selectedDonut === 'projects' ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-200'}`}>
+              <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'projects' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Major Expenditures</h2>
                 <div className="h-48 sm:h-56 w-full opacity-60 touch-pan-y">
                   <ResponsiveContainer width="100%" height="100%">
@@ -521,7 +532,6 @@ export default function App() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Mobile-Only Easy Tap List */}
                 <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in opacity-80">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {projectsDonutData.slice(0, 5).map((entry, index) => {
@@ -557,7 +567,7 @@ export default function App() {
             {/* BUDGET TABLE */}
             {(selectedCategory && selectedDonut === 'budget') && (
               <div id="budget-table" className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4">
+                <div className={`flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 ${selectedAccount ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-3">
                     <Table2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 shrink-0" />
                     <div>
@@ -599,8 +609,10 @@ export default function App() {
                           {paginatedBudgetTable.map((row, idx) => {
                             const pct = row.budget > 0 ? ((row.spend / row.budget) * 100).toFixed(1) : 0;
                             const isSelected = selectedAccount?.description === row.description;
+                            const hideOnMobile = selectedAccount && !isSelected;
+                            
                             return (
-                              <tr key={`budget-row-${idx}`} onClick={() => { setSelectedAccount(isSelected ? null : row); setCheckPage(1); }} className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-slate-50 border-l-4 border-transparent'}`}>
+                              <tr key={`budget-row-${idx}`} onClick={() => { setSelectedAccount(isSelected ? null : row); setCheckPage(1); }} className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-slate-50 border-l-4 border-transparent'} ${hideOnMobile ? 'hidden lg:table-row' : ''}`}>
                                 <td className="px-4 py-3 font-medium text-slate-800">{row.description}</td>
                                 <td className="px-4 py-3 text-right font-mono text-slate-600">${row.budget.toLocaleString()}</td>
                                 <td className="px-4 py-3 text-right font-mono font-medium text-slate-800">${row.spend.toLocaleString()}</td>
@@ -608,10 +620,21 @@ export default function App() {
                               </tr>
                             );
                           })}
+                          
+                          {/* Mobile-Only Close Row Button */}
+                          {selectedAccount && (
+                            <tr className="lg:hidden bg-blue-50 border-t border-blue-100 animate-in fade-in">
+                              <td colSpan="4" className="p-0">
+                                <button onClick={() => setSelectedAccount(null)} className="w-full py-3 flex items-center justify-center gap-2 text-blue-700 font-bold active:bg-blue-100 transition-colors">
+                                  <X className="w-4 h-4"/> Close Row
+                                </button>
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4">
+                    <div className={`flex-col sm:flex-row justify-between items-center gap-3 mt-4 ${selectedAccount ? 'hidden lg:flex' : 'flex'}`}>
                       <span className="text-xs sm:text-sm text-slate-500">Showing {paginatedBudgetTable.length} of {sortedBudgetTable.length} entries</span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setBudgetPage(p => Math.max(1, p - 1))} disabled={budgetPage === 1} className="p-1 sm:p-2 rounded hover:bg-slate-100 disabled:opacity-50"><ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5"/></button>
@@ -627,7 +650,7 @@ export default function App() {
             {/* PAYROLL TABLE */}
             {(selectedCategory && selectedDonut === 'payroll') && (
               <div id="payroll-table" className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4">
+                <div className={`flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 ${selectedEmployee ? 'hidden lg:flex' : 'flex'}`}>
                   <div className="flex items-center gap-3">
                     <Table2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 shrink-0" />
                     <div>
@@ -670,8 +693,10 @@ export default function App() {
                         <tbody className="divide-y divide-slate-100">
                           {paginatedPayrollTable.map((row, idx) => {
                             const isSelected = selectedEmployee?.name === row.name;
+                            const hideOnMobile = selectedEmployee && !isSelected;
+                            
                             return (
-                              <tr key={`payroll-row-${idx}`} onClick={() => setSelectedEmployee(isSelected ? null : row)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'hover:bg-slate-50 border-l-4 border-transparent'}`}>
+                              <tr key={`payroll-row-${idx}`} onClick={() => setSelectedEmployee(isSelected ? null : row)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'hover:bg-slate-50 border-l-4 border-transparent'} ${hideOnMobile ? 'hidden lg:table-row' : ''}`}>
                                 <td className="px-4 py-3 font-medium text-slate-800">{row.name}</td>
                                 <td className="px-4 py-3 text-slate-600">{row.position}</td>
                                 <td className="px-4 py-3 text-right font-mono text-slate-600">${row.basePay.toLocaleString()}</td>
@@ -681,10 +706,21 @@ export default function App() {
                               </tr>
                             );
                           })}
+                          
+                          {/* Mobile-Only Close Row Button */}
+                          {selectedEmployee && (
+                            <tr className="lg:hidden bg-indigo-50 border-t border-indigo-100 animate-in fade-in">
+                              <td colSpan="6" className="p-0">
+                                <button onClick={() => setSelectedEmployee(null)} className="w-full py-3 flex items-center justify-center gap-2 text-indigo-700 font-bold active:bg-indigo-100 transition-colors">
+                                  <X className="w-4 h-4"/> Close Row
+                                </button>
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4">
+                    <div className={`flex-col sm:flex-row justify-between items-center gap-3 mt-4 ${selectedEmployee ? 'hidden lg:flex' : 'flex'}`}>
                       <span className="text-xs sm:text-sm text-slate-500">Showing {paginatedPayrollTable.length} of {sortedPayrollTable.length} employees</span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setPayrollPage(p => Math.max(1, p - 1))} disabled={payrollPage === 1} className="p-1 sm:p-2 rounded hover:bg-slate-100 disabled:opacity-50"><ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5"/></button>
