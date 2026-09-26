@@ -4,16 +4,21 @@ on:
     - cron: '0 3 * * *' # Runs at 3:00 AM UTC every day
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
+# NEW: Explicitly grant the bot permission to push to the repo
+permissions:
+  contents: write
+
 jobs:
   update-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      # UPDATED to v4 to clear the deprecation warnings
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           
       - name: Run Data Pipeline
         run: node scripts/fetch-data.js

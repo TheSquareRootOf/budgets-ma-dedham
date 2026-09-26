@@ -30,7 +30,7 @@ async function fetchSocrata(datasetId, limit, chunks) {
 }
 
 async function runPipeline() {
-  console.log('Starting data pipeline...');
+  console.log('Starting optimized data pipeline...');
   const dataDir = path.join(__dirname, '../public/data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
@@ -41,7 +41,7 @@ async function runPipeline() {
     const charDesc = (row.charactercodedescription || '').toLowerCase();
     const desc = (row.accountdescription || row.description || row.object || '').toLowerCase();
     return {
-      id: row.uniqueid || `budg-${i}`,
+      id: i, // Use integer instead of 36-char UUID to save space
       fiscalYear: row.fiscalyear || '2027',
       department: categorizeDepartment(row.department || row.organization || row.functiongroup),
       description: row.accountdescription || row.description || row.object || 'Uncategorized Expense',
@@ -53,11 +53,11 @@ async function runPipeline() {
   });
   fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
 
-  // 2. Payroll
+  // 2. Payroll (Capped at 300k rows, dropped massive metadata fields)
   console.log('Fetching Payroll...');
-  const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); // 500k rows
+  const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 6); 
   const payroll = rawPayroll.map((row, i) => ({
-    id: row.uniqueid || `pay-${i}`,
+    id: i, 
     fiscalYear: row.fiscalyear || '2027',
     department: categorizeDepartment(row.department || row.organization || row.functiongroup),
     name: (row.firstname || row.lastname) ? `${row.firstname || ''} ${row.lastname || ''}`.trim() : 'Unknown Employee',
@@ -66,7 +66,7 @@ async function runPipeline() {
     overtime: parseFloat(row.overtimepay || 0),
     otherPay: parseFloat(row.otherpay || row.other_pay || 0), 
     total: parseFloat(row.totalpay || 0),
-    date: row.transactiondate || row.checkdate || row.date || ''
+    date: (row.transactiondate || row.checkdate || row.date || '').split('T')[0] // Drop the timestamp to save space
   }));
   fs.writeFileSync(path.join(dataDir, 'payroll.json'), JSON.stringify(payroll));
 
@@ -74,7 +74,7 @@ async function runPipeline() {
   console.log('Fetching Projects...');
   const rawProjects = await fetchSocrata(DATASETS.projects, 50000, 1);
   const projects = rawProjects.filter(row => parseFloat(row.actual) > 25000).map((item, i) => ({
-    id: item.uniqueid || `proj-${i}`,
+    id: i,
     fiscalYear: item.fiscalyear || '2027',
     department: categorizeDepartment(item.organization || item.functiongroup),
     name: item.description || 'Major Expenditure',
@@ -82,11 +82,11 @@ async function runPipeline() {
   }));
   fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
 
-  // 4. Checks
+  // 4. Checks (Capped at 250k rows)
   console.log('Fetching Checkbook...');
-  const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 6); // 300k rows
+  const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 5); 
   const checks = rawChecks.map((item, i) => ({
-    id: item.uniqueid || `chk-${i}`,
+    id: i,
     fiscalYear: item.fiscalyear || '2027',
     department: categorizeDepartment(item.organization || item.functiongroup),
     accountDescription: item.accountdescription || item.charactercodedescription || item.object || 'Uncategorized Expense',
@@ -94,7 +94,7 @@ async function runPipeline() {
     vendor: item.vendorname || 'Unknown Vendor', 
     amount: parseFloat(item.actual || 0), 
     description: item.description || '',
-    date: item.date ? new Date(item.date).toLocaleDateString() : 'N/A',
+    date: (item.date || '').split('T')[0],
     checkNumber: item.paymentchecknumber || item.checknumber || 'N/A'
   }));
   fs.writeFileSync(path.join(dataDir, 'checkbook.json'), JSON.stringify(checks));
