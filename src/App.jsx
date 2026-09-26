@@ -57,7 +57,6 @@ export default function App() {
 
   useEffect(() => {
     async function loadData() {
-      // With the new ETL script, this fetches instantly from local JSON
       const [budget, payroll, projects, vendors] = await Promise.all([
         fetchOperatingBudget(), fetchPayrollData(), fetchCapitalProjects(), fetchVendorCheckbook()
       ]);
@@ -433,15 +432,16 @@ export default function App() {
             {!selectedCategory && (
               <div className="p-6 sm:p-8 bg-blue-50 border border-blue-100 rounded-2xl text-center shadow-inner animate-in fade-in duration-500">
                 <h2 className="text-xl sm:text-3xl font-bold text-blue-600 mb-2">Welcome to Dedham Dollars</h2>
-                <p className="text-blue-800 text-sm sm:text-lg">To start your analysis, simply click a colorful category on any of the charts below.</p>
+                <p className="text-blue-800 text-sm sm:text-lg">To start your analysis, simply tap a colorful category on any of the charts below.</p>
               </div>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* BUDGET DONUT CARD */}
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all hover:shadow-md flex flex-col items-center ${selectedDonut === 'budget' ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 text-center">Funds Spent by Category</h2>
                 <p className="text-xs sm:text-sm text-slate-500 mb-4 text-center">(Excluding Payroll)</p>
-                <div className="h-48 sm:h-56 w-full cursor-pointer">
+                <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={top10Budget} innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="spend" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setBudgetPage(1); }}>
@@ -451,11 +451,32 @@ export default function App() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
+                {/* Mobile-Only Easy Tap List */}
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {top10Budget.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === entry.name && selectedDonut === 'budget';
+                    return (
+                      <button 
+                        key={`mob-budg-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(entry.name); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setBudgetPage(1); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.spend)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
+              {/* PAYROLL DONUT CARD */}
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all hover:shadow-md flex flex-col items-center ${selectedDonut === 'payroll' ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Payroll Spent by Category</h2>
-                <div className="h-48 sm:h-56 w-full cursor-pointer">
+                <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={payrollDonutData} innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="total" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setPayrollPage(1); }}>
@@ -465,11 +486,32 @@ export default function App() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
+                {/* Mobile-Only Easy Tap List */}
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {payrollDonutData.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === entry.name && selectedDonut === 'payroll';
+                    return (
+                      <button 
+                        key={`mob-pay-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(entry.name); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setPayrollPage(1); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 1) % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.total)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
+              {/* PROJECTS DONUT CARD */}
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all hover:shadow-md flex flex-col items-center ${selectedDonut === 'projects' ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Major Expenditures</h2>
-                <div className="h-48 sm:h-56 w-full opacity-60">
+                <div className="h-48 sm:h-56 w-full opacity-60 touch-pan-y">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={projectsDonutData} innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="value" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); }}>
@@ -478,6 +520,26 @@ export default function App() {
                       <Tooltip formatter={formatCurrency} />
                     </PieChart>
                   </ResponsiveContainer>
+                </div>
+                {/* Mobile-Only Easy Tap List */}
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in opacity-80">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {projectsDonutData.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === entry.name && selectedDonut === 'projects';
+                    return (
+                      <button 
+                        key={`mob-proj-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(entry.name); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 2) % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.value)}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -719,6 +781,7 @@ export default function App() {
                             <th className="px-4 py-3 font-semibold text-slate-200 cursor-pointer" onClick={() => requestCheckSort('date')}><div className="flex items-center gap-1">Date <ArrowUpDown className="w-3 h-3 text-slate-500" /></div></th>
                             <th className="px-4 py-3 font-semibold text-slate-200 cursor-pointer" onClick={() => requestCheckSort('vendor')}><div className="flex items-center gap-1">Vendor <ArrowUpDown className="w-3 h-3 text-slate-500" /></div></th>
                             <th className="px-4 py-3 font-semibold text-slate-200 cursor-pointer" onClick={() => requestCheckSort('description')}><div className="flex items-center gap-1">Description <ArrowUpDown className="w-3 h-3 text-slate-500" /></div></th>
+                            <th className="px-4 py-3 font-semibold text-slate-200 cursor-pointer" onClick={() => requestCheckSort('checkNumber')}><div className="flex items-center gap-1">Check # <ArrowUpDown className="w-3 h-3 text-slate-500" /></div></th>
                             <th className="px-4 py-3 font-semibold text-slate-200 cursor-pointer text-right" onClick={() => requestCheckSort('amount')}><div className="flex items-center justify-end gap-1">Amount <ArrowUpDown className="w-3 h-3 text-slate-500" /></div></th>
                           </tr>
                         </thead>
@@ -728,6 +791,7 @@ export default function App() {
                               <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{check.date}</td>
                               <td className="px-4 py-3 font-medium text-white">{check.vendor}</td>
                               <td className="px-4 py-3 text-slate-400 truncate max-w-[200px]" title={check.description}>{check.description}</td>
+                              <td className="px-4 py-3 text-slate-500 font-mono text-xs">{check.checkNumber}</td>
                               <td className="px-4 py-3 text-right font-mono font-medium text-emerald-400">${check.amount.toLocaleString()}</td>
                             </tr>
                           ))}
