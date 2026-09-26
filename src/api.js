@@ -1,36 +1,124 @@
+const SOCRATA_DOMAIN = 'dedhamma.data.socrata.com'; 
+
+const DATASETS = {
+  budget: 'dnxw-cwsb',      
+  payroll: 'bhma-x87a',     
+  projects: 'yd4k-4rzp',    
+  checkbook: 'yd4k-4rzp'    
+};
+
+function categorizeDepartment(rawName) {
+  const name = (rawName || '').toLowerCase();
+  
+  if (name.includes('school') || name.includes('education') || name.includes('sped') || name.includes('oakdale') || name.includes('avery') || name.includes('greenlodge') || name.includes('riverdale') || name.includes('ecec') || name.includes('dhs') || name.includes('dms') || name.includes('elementary') || name.includes('early childhood')) return 'Education';
+  if (name.includes('police') || name.includes('fire') || name.includes('safety') || name.includes('dispatch') || name.includes('animal')) return 'Public Safety';
+  if (name.includes('dpw') || name.includes('works') || name.includes('snow') || name.includes('highway') || name.includes('cemetery') || name.includes('engineering') || name.includes('sewer') || name.includes('street') || name.includes('facilities')) return 'Public Works';
+  if (name.includes('library') || name.includes('rec') || name.includes('park')) return 'Culture & Recreation';
+  if (name.includes('health') || name.includes('aging') || name.includes('veteran') || name.includes('human') || name.includes('youth')) return 'Human Services';
+  if (name.includes('retire') || name.includes('benefit') || name.includes('insurance') || name.includes('medicare') || name.includes('empben')) return 'Benefits & Insurance';
+  if (name.includes('debt') || name.includes('borrow') || name.includes('interest')) return 'Debt Service';
+  
+  return 'General Government'; 
+}
+
 export async function fetchOperatingBudget() {
-  return [
-    { name: 'Education', budget: 53500000, spend: 52100000 },
-    { name: 'Public Safety', budget: 14200000, spend: 13900000 },
-    { name: 'Public Works', budget: 8500000, spend: 8100000 },
-    { name: 'General Government', budget: 6100000, spend: 5800000 },
-    { name: 'Human Services', budget: 1800000, spend: 1750000 }
-  ];
+  try {
+    const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.budget}.json?$limit=50000&$order=fiscalyear DESC`);
+    const rawData = await response.json();
+    
+    return rawData.map((row, index) => {
+      const charDesc = (row.charactercodedescription || '').toLowerCase();
+      const desc = (row.accountdescription || row.description || row.object || '').toLowerCase();
+      const isPayroll = charDesc.includes('personal services') || desc.includes('salary') || desc.includes('wages') || desc.includes('payroll');
+
+      return {
+        id: row.uniqueid || `budg-${index}`,
+        fiscalYear: row.fiscalyear || '2027',
+        department: categorizeDepartment(row.department || row.organization || row.functiongroup),
+        description: row.accountdescription || row.description || row.object || 'Uncategorized Expense',
+        accountCode: row.objectcode || row.accountid || '', 
+        budget: parseFloat(row.originalbudget || 0),
+        spend: parseFloat(row.actual || 0),
+        isPayroll
+      };
+    });
+  } catch (error) {
+    return [];
+  }
 }
 
 export async function fetchPayrollData() {
-  return [
-    { department: 'Education', basePay: 35000000, overtime: 150000, total: 35150000 },
-    { department: 'Police', basePay: 4500000, overtime: 850000, total: 5350000 },
-    { department: 'Fire', basePay: 4100000, overtime: 920000, total: 5020000 },
-    { department: 'Public Works', basePay: 2800000, overtime: 350000, total: 3150000 }
-  ];
+  try {
+    const limit = 50000;
+    const offsets = [0, 50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000];
+    
+    const fetchPromises = offsets.map(offset => 
+      fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.payroll}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`)
+        .then(res => res.json())
+    );
+    
+    const results = await Promise.all(fetchPromises);
+    const rawData = results.flat(); 
+    
+    return rawData.map((row, index) => ({
+      id: row.uniqueid || `pay-${index}`,
+      fiscalYear: row.fiscalyear || '2027',
+      department: categorizeDepartment(row.department || row.organization || row.functiongroup),
+      name: (row.firstname || row.lastname) ? `${row.firstname || ''} ${row.lastname || ''}`.trim() : 'Unknown Employee',
+      position: row.position || 'Unknown Title',
+      basePay: parseFloat(row.basepay || 0),
+      overtime: parseFloat(row.overtimepay || 0),
+      otherPay: parseFloat(row.otherpay || row.other_pay || 0), 
+      total: parseFloat(row.totalpay || 0),
+      date: row.transactiondate || row.checkdate || row.date || ''
+    }));
+  } catch (error) {
+    return [];
+  }
 }
 
 export async function fetchCapitalProjects() {
-  return [
-    { id: 'PROJ-001', name: 'High School Roof', department: 'Education', originalBudget: 40000 },
-    { id: 'PROJ-002', name: 'Sidewalk Flowers', department: 'Public Works', originalBudget: 25000 },
-    { id: 'PROJ-003', name: 'Road Marking Paint', department: 'Public Works', originalBudget: 50000 }
-  ];
+  try {
+    const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.projects}.json?$limit=50000&$order=fiscalyear DESC`);
+    const rawData = await response.json();
+    
+    const largeExpenditures = rawData.filter(row => parseFloat(row.actual) > 25000);
+    return largeExpenditures.map((item, index) => ({
+      id: item.uniqueid || `proj-${index}`,
+      fiscalYear: item.fiscalyear || '2027',
+      department: categorizeDepartment(item.organization || item.functiongroup),
+      name: item.description || 'Major Expenditure',
+      originalBudget: parseFloat(item.actual || 0) 
+    }));
+  } catch (error) {
+    return [];
+  }
 }
 
 export async function fetchVendorCheckbook() {
-  return [
-    { id: 'CHK-01', vendor: 'Smith Roofing Co.', amount: 25000, department: 'Education', description: 'Roofing Materials' },
-    { id: 'CHK-02', vendor: 'Smith Roofing Co.', amount: 10000, department: 'Education', description: 'Labor Install Phase 1' },
-    { id: 'CHK-03', vendor: 'Smith Roofing Co.', amount: 45000, department: 'Education', description: 'Labor Install Phase 2 (Overrun)' },
-    { id: 'CHK-04', vendor: 'Town Florist', amount: 15000, department: 'Public Works', description: 'Spring Bulbs' },
-    { id: 'CHK-05', vendor: 'XYZ Paving', amount: 5000, department: 'Public Works', description: 'Yellow Paint' }
-  ];
+  try {
+    const limit = 50000;
+    const offsets = [0, 50000, 100000, 150000, 200000, 250000];
+    const fetchPromises = offsets.map(offset => 
+      fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.checkbook}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`)
+        .then(res => res.json())
+    );
+    const results = await Promise.all(fetchPromises);
+    const rawData = results.flat();
+    
+    return rawData.map((item, index) => ({
+      id: item.uniqueid || `chk-${index}`,
+      fiscalYear: item.fiscalyear || '2027',
+      department: categorizeDepartment(item.organization || item.functiongroup),
+      accountDescription: item.accountdescription || item.charactercodedescription || item.object || 'Uncategorized Expense',
+      accountCode: item.objectcode || item.accountid || '',
+      vendor: item.vendorname || 'Unknown Vendor', 
+      amount: parseFloat(item.actual || 0), 
+      description: item.description || '',
+      date: item.date ? new Date(item.date).toLocaleDateString() : 'N/A',
+      checkNumber: item.paymentchecknumber || item.checknumber || 'N/A'
+    }));
+  } catch (error) {
+    return [];
+  }
 }
