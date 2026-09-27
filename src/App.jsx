@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Building2, Search, FilterX, Table2, ArrowUpDown, CalendarDays, 
   ChevronRight, ChevronLeft, Maximize2, Minimize2, X, ChevronDown, Check, Minus, TrendingUp, Calendar,
-  AlertCircle, Loader2
+  AlertCircle, Loader2, Info, ShieldAlert
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
@@ -28,7 +28,12 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   
-  const [showDisclaimer, setShowDisclaimer] = useState(() => {
+  // Modal States
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
+
+  // Initial splash disclaimer state (persisted)
+  const [showDisclaimerNotice, setShowDisclaimerNotice] = useState(() => {
     return localStorage.getItem('dedhamDisclaimerDismissed') !== 'true';
   });
 
@@ -101,8 +106,8 @@ export default function App() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleDismissDisclaimer = () => {
-    setShowDisclaimer(false);
+  const handleDismissNotice = () => {
+    setShowDisclaimerNotice(false);
     localStorage.setItem('dedhamDisclaimerDismissed', 'true');
   };
 
@@ -186,7 +191,8 @@ export default function App() {
     return acc;
   }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
 
-  const categoryBudgetItems = (selectedCategory && selectedDonut === 'budget') ? nonPayrollBudget.filter(r => r.department === selectedCategory) : [];
+  // Logic updated to support "ALL" parameter
+  const categoryBudgetItems = (selectedCategory && selectedDonut === 'budget') ? (selectedCategory === 'ALL' ? nonPayrollBudget : nonPayrollBudget.filter(r => r.department === selectedCategory)) : [];
   const tableSearchLower = budgetTableSearch.toLowerCase();
   const filteredCategoryItems = categoryBudgetItems.filter(row => !budgetTableSearch || row.description.toLowerCase().includes(tableSearchLower));
 
@@ -209,7 +215,8 @@ export default function App() {
   const totalBudgetPages = Math.ceil(sortedBudgetTable.length / budgetPageSize);
   const paginatedBudgetTable = sortedBudgetTable.slice((budgetPage - 1) * budgetPageSize, budgetPage * budgetPageSize);
 
-  const categoryPayrollItems = (selectedCategory && selectedDonut === 'payroll') ? searchFilteredPayroll.filter(r => r.department === selectedCategory) : [];
+  // Payroll Table supports "ALL" parameter
+  const categoryPayrollItems = (selectedCategory && selectedDonut === 'payroll') ? (selectedCategory === 'ALL' ? searchFilteredPayroll : searchFilteredPayroll.filter(r => r.department === selectedCategory)) : [];
   const payrollSearchLower = payrollTableSearch.toLowerCase();
   
   const groupedPayrollTable = Object.values(categoryPayrollItems.reduce((acc, row) => {
@@ -266,7 +273,8 @@ export default function App() {
 
   const accountChecks = (selectedAccount && selectedDonut === 'budget') ? currentCheckbook.filter(c => {
     if (!selectedAccount.spend || selectedAccount.spend === 0) return false;
-    if (c.department !== selectedCategory) return false;
+    // If 'ALL' is selected, skip department matching check
+    if (selectedCategory !== 'ALL' && c.department !== selectedCategory) return false;
     if (selectedAccount.accountCode && c.accountCode && c.accountCode === selectedAccount.accountCode) return true;
     const targetDesc = (selectedAccount.description || '').toLowerCase().trim();
     const checkAccDesc = (c.accountDescription || '').toLowerCase().trim();
@@ -298,11 +306,65 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8" id="dashboard-top">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6 md:p-8 relative" id="dashboard-top">
+      
+      {/* MODAL OVERLAYS */}
+      {showAboutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
+            <button onClick={() => setShowAboutModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-4 text-blue-600">
+              <Info className="w-6 h-6" />
+              <h2 className="text-xl font-bold">About Dedham Dollars</h2>
+            </div>
+            <p className="text-slate-600 text-sm leading-relaxed mb-4">
+              Dedham Dollars is an open-source initiative designed to make municipal finances accessible, readable, and actionable for all taxpayers. 
+            </p>
+            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              Our goal is to pull the curtain back on the complex ledger codes and sprawling datasets, presenting the town's operations in a clean, interactive dashboard. (Full custom text to come).
+            </p>
+            <button onClick={() => setShowAboutModal(false)} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2 rounded-lg transition-colors">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showDisclaimerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl relative">
+            <button onClick={() => setShowDisclaimerModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-4 text-amber-600">
+              <ShieldAlert className="w-6 h-6" />
+              <h2 className="text-xl font-bold">Data Notice & Disclaimer</h2>
+            </div>
+            <p className="text-slate-600 text-sm leading-relaxed mb-4">
+              This information is sourced directly from Dedham's open data portal APIs. While we apply standard practices to map funds to specific categories and vendor checks, municipal accounting structures are highly complex.
+            </p>
+            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              Some checks may be imperfectly linked, categorized to obscure master accounts, or represent internal journal transfers rather than direct cash payouts. Please verify specific inquiries directly with official Town records.
+            </p>
+            <button onClick={() => setShowDisclaimerModal(false)} className="w-full bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold py-2 rounded-lg transition-colors">
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
-        
-        <header className="mb-6">
-          <div className="flex items-center gap-3 mb-6">
+        <header className="mb-6 relative">
+          
+          {/* Global Top Nav Menu */}
+          <div className="absolute top-0 right-0 flex items-center gap-4 text-sm font-medium">
+            <button onClick={() => setShowAboutModal(true)} className="text-slate-500 hover:text-blue-600 transition-colors">About</button>
+            <button onClick={() => setShowDisclaimerModal(true)} className="text-slate-500 hover:text-amber-600 transition-colors">Disclaimer</button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-6 pt-2">
             <Building2 className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600 shrink-0" />
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dedham Dollars</h1>
@@ -366,7 +428,6 @@ export default function App() {
                 )}
               </div>
               
-              {/* Universal Clear Filters Button */}
               {(selectedCategory || selectedAccount || selectedEmployee || globalSearch) && (
                 <button onClick={() => { setGlobalSearch(''); resetFilters(); }} className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
                   <FilterX className="w-4 h-4" /> Clear Filters
@@ -376,7 +437,7 @@ export default function App() {
           </div>
         </header>
 
-        {showDisclaimer && (
+        {showDisclaimerNotice && (
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 mb-8 animate-in fade-in duration-300">
             <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -384,7 +445,7 @@ export default function App() {
                 <strong>Data Notice:</strong> Sourced from Dedham's open portal. Municipal accounting is complex; some checks or categorizations may be imperfectly linked. Verify specific inquiries with official Town records.
               </p>
             </div>
-            <button onClick={handleDismissDisclaimer} className="text-amber-500 hover:text-amber-700 transition-colors shrink-0" title="Dismiss Notice">
+            <button onClick={handleDismissNotice} className="text-amber-500 hover:text-amber-700 transition-colors shrink-0" title="Dismiss Notice">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -446,7 +507,7 @@ export default function App() {
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'budget' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 text-center">Funds Spent by Category</h2>
                 <p className="text-xs sm:text-sm text-slate-500 mb-4 text-center">(Excluding Payroll)</p>
-                <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
+                <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y relative pb-8">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={top10Budget} innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="spend" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setBudgetPage(1); }}>
@@ -455,6 +516,11 @@ export default function App() {
                       <Tooltip formatter={formatCurrency} />
                     </PieChart>
                   </ResponsiveContainer>
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-center pb-2">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setBudgetPage(1); }} className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
+                      View All Data
+                    </button>
+                  </div>
                 </div>
                 <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
@@ -479,7 +545,7 @@ export default function App() {
 
               <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'payroll' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-4 text-center">Payroll Spent by Category</h2>
-                <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y">
+                <div className="h-48 sm:h-56 w-full cursor-pointer touch-pan-y relative pb-8">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={payrollDonutData} innerRadius="55%" outerRadius="80%" paddingAngle={5} dataKey="total" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setPayrollPage(1); }}>
@@ -488,6 +554,11 @@ export default function App() {
                       <Tooltip formatter={formatCurrency} />
                     </PieChart>
                   </ResponsiveContainer>
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-center pb-2">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setPayrollPage(1); }} className="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
+                      View All Data
+                    </button>
+                  </div>
                 </div>
                 <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
@@ -547,9 +618,10 @@ export default function App() {
             {selectedCategory && (
               <div className="bg-blue-600 text-white p-5 sm:p-6 rounded-2xl shadow-md border border-blue-700 animate-in fade-in duration-300">
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                  {selectedDonut === 'budget' ? `Funds Spent: ${selectedCategory}` : 
-                   selectedDonut === 'payroll' ? `Payroll Compensation: ${selectedCategory}` : 
-                   `Major Expenditures: ${selectedCategory}`}
+                  {selectedCategory === 'ALL' 
+                    ? (selectedDonut === 'budget' ? 'Entire Town Ledger: Operating Budget' : selectedDonut === 'payroll' ? 'Entire Town Ledger: Payroll' : 'Major Expenditures')
+                    : (selectedDonut === 'budget' ? `Funds Spent: ${selectedCategory}` : selectedDonut === 'payroll' ? `Payroll Compensation: ${selectedCategory}` : `Major Expenditures: ${selectedCategory}`)
+                  }
                 </h2>
               </div>
             )}
