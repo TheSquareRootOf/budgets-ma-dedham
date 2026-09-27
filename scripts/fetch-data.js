@@ -20,7 +20,7 @@ function categorizeDepartment(rawName) {
   return 'General Government'; 
 }
 
-// NEW: Sequential fetching to prevent server crash (ECONNRESET)
+// Sequential fetching to prevent server crash (ECONNRESET)
 async function fetchSocrata(datasetId, limit, chunks) {
   const results = [];
   for (let i = 0; i < chunks; i++) {
@@ -49,6 +49,14 @@ async function runPipeline() {
   // 1. Budget
   console.log('Fetching Budget...');
   const rawBudget = await fetchSocrata(DATASETS.budget, 50000, 1);
+  
+  // ---> NEW DEBUG BLOCK <---
+  if (rawBudget.length > 0) {
+    console.log("\n--- Socrata API Schema Hunt ---");
+    console.log("BUDGET COLUMNS AVAILABLE:", Object.keys(rawBudget[0]));
+    console.log("-------------------------------\n");
+  }
+
   const budget = rawBudget.map((row, i) => {
     const charDesc = (row.charactercodedescription || '').toLowerCase();
     const desc = (row.accountdescription || row.description || row.object || '').toLowerCase();
@@ -65,7 +73,7 @@ async function runPipeline() {
   });
   fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
 
-  // 2. Payroll (Back to 500,000 rows!)
+  // 2. Payroll (500k limit)
   console.log('Fetching Payroll (500k limit)...');
   const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); 
   const payroll = rawPayroll.map((row, i) => ({
@@ -94,7 +102,7 @@ async function runPipeline() {
   }));
   fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
 
-  // 4. Checks (Back to 500,000 rows!)
+  // 4. Checks (500k limit)
   console.log('Fetching Checkbook (500k limit)...');
   const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 10); 
   const checks = rawChecks.map((item, i) => ({
