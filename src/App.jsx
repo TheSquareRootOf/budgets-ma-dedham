@@ -43,6 +43,7 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [fundFilter, setFundFilter] = useState('All'); 
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showInsights, setShowInsights] = useState(true);
@@ -83,6 +84,13 @@ export default function App() {
   const [checkSort, setCheckSort] = useState({ key: 'amount', direction: 'desc' });
   const [checkPage, setCheckPage] = useState(1);
   const [isCheckExpanded, setIsCheckExpanded] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize(); // set initial state
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -279,16 +287,16 @@ export default function App() {
     return acc;
   }, {})).filter(item => item.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
 
-  const projectsDonutData = Object.values(searchFilteredProjects.reduce((acc, row) => {
-    if (!acc[row.department]) acc[row.department] = { name: row.department, value: 0 };
-    acc[row.department].value += row.value;
-    return acc;
-  }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
-
   const vendorDonutData = Object.values(searchFilteredCheckbook.reduce((acc, row) => {
     if (!row.vendor || row.vendor === 'Unknown Vendor') return acc;
     if (!acc[row.vendor]) acc[row.vendor] = { name: row.vendor, value: 0 };
     acc[row.vendor].value += row.amount;
+    return acc;
+  }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
+
+  const projectsDonutData = Object.values(searchFilteredProjects.reduce((acc, row) => {
+    if (!acc[row.department]) acc[row.department] = { name: row.department, value: 0 };
+    acc[row.department].value += row.value;
     return acc;
   }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
 
@@ -463,11 +471,11 @@ export default function App() {
   } else if (selectedDonut === 'payroll') {
     breadcrumbs.push({ id: 'payroll-table', label: 'Payroll by Category', hasResults: sortedPayrollTable.length > 0 });
     breadcrumbs.push({ id: 'employee-chart', label: 'Payroll Detail', hasResults: selectedEmployee && employeeChartData.length > 0 });
-  } else if (selectedDonut === 'projects') {
-    breadcrumbs.push({ id: 'projects-table', label: 'Major Expenditures', hasResults: sortedProjectsTable.length > 0 });
   } else if (selectedDonut === 'vendor') {
     breadcrumbs.push({ id: 'master-vendor-table', label: 'Vendor Master List', hasResults: sortedVendorTable.length > 0 });
     breadcrumbs.push({ id: 'dynamic-chart', label: 'Vendor Detail', hasResults: selectedVendor && chartData.length > 0 });
+  } else if (selectedDonut === 'projects') {
+    breadcrumbs.push({ id: 'projects-table', label: 'Major Expenditures', hasResults: sortedProjectsTable.length > 0 });
   }
 
   return (
@@ -611,7 +619,7 @@ export default function App() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text"
-                  placeholder="Search by: Name (teacher, officer, staff, vendor), by Category (safety), by Description (street, road), by Check Number, etc."
+                  placeholder={isMobile ? "Search: Name, Vendor, Check #, Description, etc." : "Search by: Name (teacher, officer, staff, vendor), by Category (safety), by Description (street, road), by Check Number, etc."}
                   value={globalSearch}
                   onChange={(e) => handleSearch(e.target.value)}
                   className="w-full pl-10 pr-10 py-2.5 sm:py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all text-sm"
@@ -689,6 +697,7 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
               
+              {/* DONUT 1: BUDGET */}
               <div className={`bg-white p-4 sm:p-5 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'budget' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <div className="flex items-center gap-2 mb-1 justify-center">
                   <h2 className="text-sm sm:text-base font-bold text-slate-800">Funds Spent</h2>
@@ -703,20 +712,40 @@ export default function App() {
                 <div className="h-44 w-full cursor-pointer touch-pan-y relative pb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={top10Budget} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="spend" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setBudgetPage(1); }}>
+                      <Pie data={top10Budget} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="spend" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setBudgetPage(1); setTimeout(() => scrollToSection('budget-table'), 200); }}>
                         {top10Budget.map((entry, index) => <Cell key={`budget-cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={formatCurrency} wrapperStyle={{ pointerEvents: 'none' }} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute bottom-0 left-0 right-0 flex justify-center">
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setBudgetPage(1); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setBudgetPage(1); setTimeout(() => scrollToSection('budget-table'), 200); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
                       View All Data
                     </button>
                   </div>
                 </div>
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {top10Budget.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === entry.name && selectedDonut === 'budget';
+                    return (
+                      <button 
+                        key={`mob-budg-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(entry.name); setSelectedDonut('budget'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setBudgetPage(1); setTimeout(() => scrollToSection('budget-table'), 200); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.spend)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
+              {/* DONUT 2: PAYROLL */}
               <div className={`bg-white p-4 sm:p-5 rounded-2xl shadow-sm border transition-all flex-col items-center hover:shadow-md ${selectedDonut === 'payroll' ? 'border-blue-400 ring-2 ring-blue-50 flex' : selectedDonut ? 'hidden lg:flex' : 'flex border-slate-200'}`}>
                 <div className="flex items-center gap-2 mb-1 justify-center">
                   <h2 className="text-sm sm:text-base font-bold text-slate-800">Payroll Spent</h2>
@@ -731,17 +760,36 @@ export default function App() {
                 <div className="h-44 w-full cursor-pointer touch-pan-y relative pb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={payrollDonutData} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="total" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setSelectedVendor(null); setPayrollPage(1); }}>
+                      <Pie data={payrollDonutData} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="total" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setSelectedVendor(null); setPayrollPage(1); setTimeout(() => scrollToSection('payroll-table'), 200); }}>
                         {payrollDonutData.map((entry, index) => <Cell key={`payroll-cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={formatCurrency} wrapperStyle={{ pointerEvents: 'none' }} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute bottom-0 left-0 right-0 flex justify-center">
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setSelectedVendor(null); setPayrollPage(1); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setSelectedVendor(null); setPayrollPage(1); setTimeout(() => scrollToSection('payroll-table'), 200); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
                       View All Data
                     </button>
                   </div>
+                </div>
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {payrollDonutData.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === entry.name && selectedDonut === 'payroll';
+                    return (
+                      <button 
+                        key={`mob-pay-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(entry.name); setSelectedDonut('payroll'); setSelectedEmployee(null); setSelectedAccount(null); setPayrollPage(1); setTimeout(() => scrollToSection('payroll-table'), 200); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 1) % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.total)}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -760,17 +808,36 @@ export default function App() {
                 <div className="h-44 w-full cursor-pointer touch-pan-y relative pb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={vendorDonutData} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="value" onClick={(data) => { setSelectedCategory('ALL'); setSelectedDonut('vendor'); setSelectedVendor({ name: data.name }); setSelectedAccount(null); setSelectedEmployee(null); setVendorPage(1); }}>
+                      <Pie data={vendorDonutData} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="value" onClick={(data) => { setSelectedCategory('ALL'); setSelectedDonut('vendor'); setSelectedVendor({ name: data.name }); setSelectedAccount(null); setSelectedEmployee(null); setVendorPage(1); setTimeout(() => scrollToSection('dynamic-chart'), 200); }}>
                         {vendorDonutData.map((entry, index) => <Cell key={`vendor-cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={formatCurrency} wrapperStyle={{ pointerEvents: 'none' }} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute bottom-0 left-0 right-0 flex justify-center">
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('vendor'); setSelectedVendor(null); setSelectedAccount(null); setSelectedEmployee(null); setVendorPage(1); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('vendor'); setSelectedVendor(null); setSelectedAccount(null); setSelectedEmployee(null); setVendorPage(1); setTimeout(() => scrollToSection('master-vendor-table'), 200); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
                       View All Data
                     </button>
                   </div>
+                </div>
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {vendorDonutData.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === 'ALL' && selectedDonut === 'vendor' && selectedVendor?.name === entry.name;
+                    return (
+                      <button 
+                        key={`mob-vendor-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('vendor'); setSelectedVendor({ name: entry.name }); setSelectedAccount(null); setSelectedEmployee(null); setVendorPage(1); setTimeout(() => scrollToSection('dynamic-chart'), 200); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 2) % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.value)}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -789,17 +856,36 @@ export default function App() {
                 <div className="h-44 w-full cursor-pointer touch-pan-y relative pb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={projectsDonutData} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="value" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setProjectsPage(1); }}>
+                      <Pie data={projectsDonutData} innerRadius="50%" outerRadius="80%" paddingAngle={5} dataKey="value" onClick={(data) => { setSelectedCategory(data.name); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setProjectsPage(1); setTimeout(() => scrollToSection('projects-table'), 200); }}>
                         {projectsDonutData.map((entry, index) => <Cell key={`project-cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={formatCurrency} wrapperStyle={{ pointerEvents: 'none' }} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute bottom-0 left-0 right-0 flex justify-center">
-                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setProjectsPage(1); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedCategory('ALL'); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); setSelectedVendor(null); setProjectsPage(1); setTimeout(() => scrollToSection('projects-table'), 200); }} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 rounded-full transition-colors border border-blue-200 shadow-sm">
                       View All Data
                     </button>
                   </div>
+                </div>
+                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in opacity-80">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
+                  {projectsDonutData.slice(0, 5).map((entry, index) => {
+                    const isSelected = selectedCategory === entry.name && selectedDonut === 'projects';
+                    return (
+                      <button 
+                        key={`mob-proj-${index}`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(entry.name); setSelectedDonut('projects'); setSelectedAccount(null); setSelectedEmployee(null); setProjectsPage(1); setTimeout(() => scrollToSection('projects-table'), 200); }}
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${isSelected ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-700 active:bg-slate-100'}`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 3) % COLORS.length] }}></div>
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className="shrink-0">{formatCurrency(entry.value)}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -1135,7 +1221,7 @@ export default function App() {
             {/* PROJECTS TABLE */}
             {(selectedCategory && selectedDonut === 'projects') && (
               <div id="projects-table" className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className={`flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 flex`}>
+                <div className="flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 flex">
                   <div className="flex items-center gap-3">
                     <Table2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 shrink-0" />
                     <div>
@@ -1144,13 +1230,11 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {!selectedAccount && (
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                      <button onClick={() => setIsProjectsExpanded(!isProjectsExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                        {isProjectsExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                    <button onClick={() => setIsProjectsExpanded(!isProjectsExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                      {isProjectsExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
+                    </button>
+                  </div>
                 </div>
                 
                 {sortedProjectsTable.length === 0 ? (
@@ -1168,39 +1252,24 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {paginatedProjectsTable.map((row, idx) => {
-                            const isSelected = selectedAccount?.date === row.date && selectedAccount?.value === row.value;
-                            const isHidden = selectedAccount && !isSelected;
-                            
-                            return (
-                              <tr key={`project-row-${idx}`} onClick={() => { setSelectedAccount(isSelected ? null : row); setCheckPage(1); }} className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-slate-50 border-l-4 border-transparent'} ${isHidden ? 'hidden' : ''}`}>
-                                <td className="px-4 py-4 font-medium text-slate-800">
-                                  <div className="flex flex-col">
-                                    <span>{row.name}</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 text-slate-600">{row.department}</td>
-                                <td className="px-4 py-4">
-                                  <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
-                                </td>
-                                <td className="px-4 py-4 text-right font-mono font-medium text-slate-800">${row.value.toLocaleString()}</td>
-                              </tr>
-                            );
-                          })}
-                          
-                          {selectedAccount && (
-                            <tr className="bg-blue-50/50 border-t border-blue-200 animate-in fade-in">
-                              <td colSpan="4" className="p-0">
-                                <button onClick={(e) => { e.stopPropagation(); setSelectedAccount(null); }} className="w-full py-2.5 flex items-center justify-center gap-2 text-blue-700 font-bold hover:bg-blue-100 transition-colors">
-                                  <X className="w-4 h-4"/> Return to Projects List
-                                </button>
+                          {paginatedProjectsTable.map((row, idx) => (
+                            <tr key={`project-row-${idx}`} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-4 py-4 font-medium text-slate-800">
+                                <div className="flex flex-col">
+                                  <span>{row.name}</span>
+                                </div>
                               </td>
+                              <td className="px-4 py-4 text-slate-600">{row.department}</td>
+                              <td className="px-4 py-4">
+                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
+                              </td>
+                              <td className="px-4 py-4 text-right font-mono font-medium text-slate-800">${row.value.toLocaleString()}</td>
                             </tr>
-                          )}
+                          ))}
                         </tbody>
                       </table>
                     </div>
-                    <div className={`flex-col sm:flex-row justify-between items-center gap-3 mt-4 ${selectedAccount ? 'hidden' : 'flex'}`}>
+                    <div className="flex-col sm:flex-row justify-between items-center gap-3 mt-4 flex">
                       <span className="text-xs sm:text-sm text-slate-500">Showing {paginatedProjectsTable.length} of {sortedProjectsTable.length} entries</span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setProjectsPage(p => Math.max(1, p - 1))} disabled={projectsPage === 1} className="p-1 sm:p-2 rounded hover:bg-slate-100 disabled:opacity-50"><ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5"/></button>
