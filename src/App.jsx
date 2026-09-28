@@ -287,16 +287,16 @@ export default function App() {
     return acc;
   }, {})).filter(item => item.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
 
+  const projectsDonutData = Object.values(searchFilteredProjects.reduce((acc, row) => {
+    if (!acc[row.department]) acc[row.department] = { name: row.department, value: 0 };
+    acc[row.department].value += row.value;
+    return acc;
+  }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
+
   const vendorDonutData = Object.values(searchFilteredCheckbook.reduce((acc, row) => {
     if (!row.vendor || row.vendor === 'Unknown Vendor') return acc;
     if (!acc[row.vendor]) acc[row.vendor] = { name: row.vendor, value: 0 };
     acc[row.vendor].value += row.amount;
-    return acc;
-  }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
-
-  const projectsDonutData = Object.values(searchFilteredProjects.reduce((acc, row) => {
-    if (!acc[row.department]) acc[row.department] = { name: row.department, value: 0 };
-    acc[row.department].value += row.value;
     return acc;
   }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
 
@@ -470,7 +470,7 @@ export default function App() {
     breadcrumbs.push({ id: 'vendor-table', label: 'Vendor Checks', hasResults: selectedAccount && sortedCheckTable.length > 0 });
   } else if (selectedDonut === 'payroll') {
     breadcrumbs.push({ id: 'payroll-table', label: 'Payroll by Category', hasResults: sortedPayrollTable.length > 0 });
-    breadcrumbs.push({ id: 'employee-chart', label: 'Payroll Detail', hasResults: selectedEmployee && employeeChartData.length > 0 });
+    breadcrumbs.push({ id: 'dynamic-chart', label: 'Payroll Detail', hasResults: selectedEmployee && chartData.length > 0 });
   } else if (selectedDonut === 'vendor') {
     breadcrumbs.push({ id: 'master-vendor-table', label: 'Vendor Master List', hasResults: sortedVendorTable.length > 0 });
     breadcrumbs.push({ id: 'dynamic-chart', label: 'Vendor Detail', hasResults: selectedVendor && chartData.length > 0 });
@@ -1221,7 +1221,7 @@ export default function App() {
             {/* PROJECTS TABLE */}
             {(selectedCategory && selectedDonut === 'projects') && (
               <div id="projects-table" className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 flex">
+                <div className={`flex-col md:flex-row md:items-center justify-between gap-4 mb-4 sm:mb-6 border-b border-slate-100 pb-4 flex`}>
                   <div className="flex items-center gap-3">
                     <Table2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 shrink-0" />
                     <div>
@@ -1230,11 +1230,13 @@ export default function App() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3 w-full md:w-auto">
-                    <button onClick={() => setIsProjectsExpanded(!isProjectsExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                      {isProjectsExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
-                    </button>
-                  </div>
+                  {!selectedAccount && (
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <button onClick={() => setIsProjectsExpanded(!isProjectsExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                        {isProjectsExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 
                 {sortedProjectsTable.length === 0 ? (
@@ -1252,20 +1254,22 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {paginatedProjectsTable.map((row, idx) => (
-                            <tr key={`project-row-${idx}`} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-4 py-4 font-medium text-slate-800">
-                                <div className="flex flex-col">
-                                  <span>{row.name}</span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-4 text-slate-600">{row.department}</td>
-                              <td className="px-4 py-4">
-                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
-                              </td>
-                              <td className="px-4 py-4 text-right font-mono font-medium text-slate-800">${row.value.toLocaleString()}</td>
-                            </tr>
-                          ))}
+                          {paginatedProjectsTable.map((row, idx) => {
+                            return (
+                              <tr key={`project-row-${idx}`} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-4 font-medium text-slate-800">
+                                  <div className="flex flex-col">
+                                    <span>{row.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 text-slate-600">{row.department}</td>
+                                <td className="px-4 py-4">
+                                  <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
+                                </td>
+                                <td className="px-4 py-4 text-right font-mono font-medium text-slate-800">${row.value.toLocaleString()}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
