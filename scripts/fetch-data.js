@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SOCRATA_DOMAIN = 'dedhamma.data.socrata.com'; 
-const DATASETS = { budget: 'dnxw-cwsb', payroll: 'bhma-x87a', projects: 'yd4k-4rzp', checkbook: 'yd4k-4rzp' };
+const DATASETS = { budget: 'dnxw-cwsb', payroll: 'bhma-x87a', projects: 'yd4k-4rzp', checkbook: 'yd4k-4rzp', vendors: 'jxte-uwe9' };
 
 function categorizeDepartment(rawName) {
   const name = (rawName || '').toLowerCase();
@@ -20,22 +20,21 @@ function categorizeDepartment(rawName) {
   return 'General Government'; 
 }
 
-// Sequential fetching to prevent server crash (ECONNRESET)
+function categorizeFund(fundStr) {
+  const str = (fundStr || '').toLowerCase();
+  if (str.includes('grant') || str.includes('state') || str.includes('federal') || str.includes('arpa') || str.includes('trust') || str.includes('special revenue') || str.includes('chapter')) return 'External Funds';
+  return 'Local Funds';
+}
+
 async function fetchSocrata(datasetId, limit, chunks) {
   const results = [];
   for (let i = 0; i < chunks; i++) {
     const offset = i * limit;
     console.log(`  - Fetching chunk ${i + 1}/${chunks} for ${datasetId}...`);
-    
     const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`);
     const data = await response.json();
-    
-    // If the API returns fewer rows than the limit, we've hit the end of the town's historical data early
     if (data.length === 0) break;
-    
     results.push(...data);
-    
-    // A polite 500ms delay between requests to keep the town's server happy
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   return results;
@@ -46,23 +45,15 @@ async function runPipeline() {
   const dataDir = path.join(__dirname, '../public/data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-  // 1. Budget
   console.log('Fetching Budget...');
   const rawBudget = await fetchSocrata(DATASETS.budget, 50000, 1);
-  
-  // ---> NEW DEBUG BLOCK <---
-  if (rawBudget.length > 0) {
-    console.log("\n--- Socrata API Schema Hunt ---");
-    console.log("BUDGET COLUMNS AVAILABLE:", Object.keys(rawBudget[0]));
-    console.log("-------------------------------\n");
-  }
-
   const budget = rawBudget.map((row, i) => {
     const charDesc = (row.charactercodedescription || '').toLowerCase();
     const desc = (row.accountdescription || row.description || row.object || '').toLowerCase();
     return {
       id: i,
       fiscalYear: row.fiscalyear || '2027',
+      fundType: categorizeFund(row.fundgroup || row.fund || ''),
       department: categorizeDepartment(row.department || row.organization || row.functiongroup),
       description: row.accountdescription || row.description || row.object || 'Uncategorized Expense',
       accountCode: row.objectcode || row.accountid || '', 
@@ -73,12 +64,12 @@ async function runPipeline() {
   });
   fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
 
-  // 2. Payroll (500k limit)
-  console.log('Fetching Payroll (500k limit)...');
+  console.log('Fetching Payroll...');
   const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); 
   const payroll = rawPayroll.map((row, i) => ({
     id: i, 
     fiscalYear: row.fiscalyear || '2027',
+    fundType: categorizeFund(row.fundgroup || row.fund || ''),
     department: categorizeDepartment(row.department || row.organization || row.functiongroup),
     name: (row.firstname || row.lastname) ? `${row.firstname || ''} ${row.lastname || ''}`.trim() : 'Unknown Employee',
     position: row.position || 'Unknown Title',
@@ -90,24 +81,27 @@ async function runPipeline() {
   }));
   fs.writeFileSync(path.join(dataDir, 'payroll.json'), JSON.stringify(payroll));
 
-  // 3. Projects
-  console.log('Fetching Projects...');
+  console.log('Fetching Projects & Major Expenditures...');
   const rawProjects = await fetchSocrata(DATASETS.projects, 50000, 1);
   const projects = rawProjects.filter(row => parseFloat(row.actual) > 25000).map((item, i) => ({
     id: i,
     fiscalYear: item.fiscalyear || '2027',
+    fundType: categorizeFund(item.fundgroup || item.fund || ''),
     department: categorizeDepartment(item.organization || item.functiongroup),
     name: item.description || 'Major Expenditure',
-    originalBudget: parseFloat(item.actual || 0) 
+    vendor: item.vendorname || 'Unknown Vendor',
+    date: (item.date || '').split('T')[0],
+    accountCode: item.objectcode || item.accountid || '',
+    value: parseFloat(item.actual || 0) 
   }));
   fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
 
-  // 4. Checks (500k limit)
-  console.log('Fetching Checkbook (500k limit)...');
+  console.log('Fetching Checkbook...');
   const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 10); 
   const checks = rawChecks.map((item, i) => ({
     id: i,
     fiscalYear: item.fiscalyear || '2027',
+    fundType: categorizeFund(item.fundgroup || item.fund || ''),
     department: categorizeDepartment(item.organization || item.functiongroup),
     accountDescription: item.accountdescription || item.charactercodedescription || item.object || 'Uncategorized Expense',
     accountCode: item.objectcode || item.accountid || '',
@@ -118,6 +112,22 @@ async function runPipeline() {
     checkNumber: item.paymentchecknumber || item.checknumber || 'N/A'
   }));
   fs.writeFileSync(path.join(dataDir, 'checkbook.json'), JSON.stringify(checks));
+
+  console.log('Fetching Vendor Profiles...');
+  const rawVendors = await fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.vendors}.json?$limit=50000`).then(res => res.json());
+  const vendorProfiles = rawVendors.map(v => ({
+    name: v.vendorname || 'Unknown Vendor',
+    address: v.address1 || '',
+    city: v.city || '',
+    state: v.state || '',
+    zip: v.zip || '',
+    phone: v.phone || v.contactphone || '',
+    contactName: v.contactname || '',
+    contactEmail: v.contactemail || '',
+    website: v.webaddress || '',
+    isWMBE: String(v.iswomenorminoritybusinessenterprise).toLowerCase() === 'y' || String(v.iswomenorminoritybusinessenterprise).toLowerCase() === 'true'
+  }));
+  fs.writeFileSync(path.join(dataDir, 'vendors.json'), JSON.stringify(vendorProfiles));
 
   console.log('Data pipeline complete! Files saved to public/data/');
 }
