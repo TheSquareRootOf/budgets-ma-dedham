@@ -6,6 +6,10 @@ on:
     - cron: '0 4 * * 0'
   workflow_dispatch: # Allows manual trigger from the Actions tab
 
+# THIS IS THE FIX FOR EXIT CODE 128
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,9 +21,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      # We intentionally removed 'npm install'. The fetch script uses pure 
-      # native Node.js and requires zero heavy web dependencies to run!
 
       - name: Run Data Pipeline
         run: node scripts/fetch-data.js
