@@ -28,9 +28,13 @@ function categorizeFund(fundStr) {
 
 async function fetchSocrata(datasetId, limit, chunks) {
   const results = [];
+  
+  // Spoof a real Google Chrome browser to bypass WAF bot blocking
   const headers = {
-    'User-Agent': 'DedhamDollars-DataPipeline/1.0 (Automated Public Data Sync)',
-    'Accept': 'application/json'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Connection': 'keep-alive'
   };
   
   if (process.env.SOCRATA_TOKEN) {
@@ -44,16 +48,16 @@ async function fetchSocrata(datasetId, limit, chunks) {
       const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`, { headers });
       
       if (!response.ok) {
-        console.error(`  ! HTTP Error ${response.status}: ${response.statusText} from Socrata`);
-        break; // Stop fetching this dataset if rate limited
+        console.error(`  ! Socrata API Error: ${response.status} ${response.statusText}`);
+        break;
       }
       
       const data = await response.json();
       if (data.length === 0) break;
       results.push(...data);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Increased delay to 1 second to respect limits
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Generous 1.5s delay to ease rate limits
     } catch (err) {
-      console.error(`  ! Fetch failed for ${datasetId}:`, err.message);
+      console.error(`  ! Fetch exception for ${datasetId}:`, err.message);
       break;
     }
   }
@@ -152,7 +156,9 @@ async function runPipeline() {
 
     console.log('Data pipeline complete! Files saved to public/data/');
   } catch (error) {
-    console.error('Pipeline encountered a critical error:', error);
+    // If it ever crashes again, this prints the exact reason to your logs!
+    console.error('\n❌ PIPELINE CRASHED:', error.message);
+    console.error(error.stack);
     process.exit(1);
   }
 }

@@ -4,7 +4,7 @@ on:
   schedule:
     # Runs at 4:00 AM UTC every Sunday (Midnight EST)
     - cron: '0 4 * * 0'
-  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+  workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:
   build:
@@ -18,8 +18,8 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Dependencies
-        run: npm install
+      # We intentionally removed 'npm install'. The fetch script uses pure 
+      # native Node.js and requires zero heavy web dependencies to run!
 
       - name: Run Data Pipeline
         run: node scripts/fetch-data.js
