@@ -28,36 +28,30 @@ function categorizeFund(fundStr) {
 
 async function fetchSocrata(datasetId, limit, chunks) {
   const results = [];
-  
-  // Spoof a real Google Chrome browser to bypass WAF bot blocking
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'User-Agent': 'DedhamDollars-DataPipeline/1.0',
     'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
     'Connection': 'keep-alive'
   };
-  
-  if (process.env.SOCRATA_TOKEN) {
-    headers['X-App-Token'] = process.env.SOCRATA_TOKEN;
-  }
 
   for (let i = 0; i < chunks; i++) {
     const offset = i * limit;
     console.log(`  - Fetching chunk ${i + 1}/${chunks} for ${datasetId}...`);
     try {
-      const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`, { headers });
+      // Removed the sorting parameter to prevent breaking on the Vendor dataset
+      const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}`, { headers });
       
       if (!response.ok) {
-        console.error(`  ! Socrata API Error: ${response.status} ${response.statusText}`);
+        console.error(`  ! API Error: ${response.status} ${response.statusText}`);
         break;
       }
       
       const data = await response.json();
       if (data.length === 0) break;
       results.push(...data);
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Generous 1.5s delay to ease rate limits
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
-      console.error(`  ! Fetch exception for ${datasetId}:`, err.message);
+      console.error(`  ! Fetch exception:`, err.message);
       break;
     }
   }
@@ -71,8 +65,8 @@ async function runPipeline() {
 
   try {
     console.log('Fetching Budget...');
-    const rawBudget = await fetchSocrata(DATASETS.budget, 50000, 1);
-    const budget = rawBudget.map((row, i) => {
+    let rawBudget = await fetchSocrata(DATASETS.budget, 50000, 1);
+    let budget = rawBudget.map((row, i) => {
       const charDesc = (row.charactercodedescription || '').toLowerCase();
       const desc = (row.accountdescription || row.description || row.object || '').toLowerCase();
       return {
@@ -88,10 +82,11 @@ async function runPipeline() {
       };
     });
     fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
+    rawBudget = null; budget = null; // Free memory
 
     console.log('Fetching Payroll...');
-    const rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); 
-    const payroll = rawPayroll.map((row, i) => ({
+    let rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); 
+    let payroll = rawPayroll.map((row, i) => ({
       id: i, 
       fiscalYear: row.fiscalyear || '2027',
       fundType: categorizeFund(row.fundgroup || row.fund || ''),
@@ -105,10 +100,11 @@ async function runPipeline() {
       date: (row.transactiondate || row.checkdate || row.date || '').split('T')[0]
     }));
     fs.writeFileSync(path.join(dataDir, 'payroll.json'), JSON.stringify(payroll));
+    rawPayroll = null; payroll = null; // Free memory
 
-    console.log('Fetching Projects & Major Expenditures...');
-    const rawProjects = await fetchSocrata(DATASETS.projects, 50000, 1);
-    const projects = rawProjects.filter(row => parseFloat(row.actual) > 25000).map((item, i) => ({
+    console.log('Fetching Projects...');
+    let rawProjects = await fetchSocrata(DATASETS.projects, 50000, 1);
+    let projects = rawProjects.filter(row => parseFloat(row.actual) > 25000).map((item, i) => ({
       id: i,
       fiscalYear: item.fiscalyear || '2027',
       fundType: categorizeFund(item.fundgroup || item.fund || ''),
@@ -120,10 +116,11 @@ async function runPipeline() {
       value: parseFloat(item.actual || 0) 
     }));
     fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
+    rawProjects = null; projects = null; // Free memory
 
     console.log('Fetching Checkbook...');
-    const rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 10); 
-    const checks = rawChecks.map((item, i) => ({
+    let rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 10); 
+    let checks = rawChecks.map((item, i) => ({
       id: i,
       fiscalYear: item.fiscalyear || '2027',
       fundType: categorizeFund(item.fundgroup || item.fund || ''),
@@ -137,10 +134,11 @@ async function runPipeline() {
       checkNumber: item.paymentchecknumber || item.checknumber || 'N/A'
     }));
     fs.writeFileSync(path.join(dataDir, 'checkbook.json'), JSON.stringify(checks));
+    rawChecks = null; checks = null; // Free memory
 
     console.log('Fetching Vendor Profiles...');
-    const rawVendors = await fetchSocrata(DATASETS.vendors, 50000, 1);
-    const vendorProfiles = rawVendors.map(v => ({
+    let rawVendors = await fetchSocrata(DATASETS.vendors, 50000, 1);
+    let vendorProfiles = rawVendors.map(v => ({
       name: v.vendorname || 'Unknown Vendor',
       address: v.address1 || '',
       city: v.city || '',
@@ -153,12 +151,11 @@ async function runPipeline() {
       isWMBE: String(v.iswomenorminoritybusinessenterprise).toLowerCase() === 'y' || String(v.iswomenorminoritybusinessenterprise).toLowerCase() === 'true'
     }));
     fs.writeFileSync(path.join(dataDir, 'vendors.json'), JSON.stringify(vendorProfiles));
+    rawVendors = null; vendorProfiles = null; // Free memory
 
-    console.log('Data pipeline complete! Files saved to public/data/');
+    console.log('Data pipeline complete!');
   } catch (error) {
-    // If it ever crashes again, this prints the exact reason to your logs!
     console.error('\n❌ PIPELINE CRASHED:', error.message);
-    console.error(error.stack);
     process.exit(1);
   }
 }
