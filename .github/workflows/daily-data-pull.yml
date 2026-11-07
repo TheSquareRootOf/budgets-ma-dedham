@@ -1,32 +1,33 @@
-name: Daily Data Pull
+name: Data Pipeline
+
 on:
   schedule:
-    - cron: '0 3 * * *' # Runs at 3:00 AM UTC every day
-  workflow_dispatch: # Allows manual trigger from GitHub UI
-
-# NEW: Explicitly grant the bot permission to push to the repo
-permissions:
-  contents: write
+    # Runs at 4:00 AM UTC every Sunday (Midnight EST)
+    - cron: '0 4 * * 0'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
 
 jobs:
-  update-data:
+  build:
     runs-on: ubuntu-latest
     steps:
-      # UPDATED to v4 to clear the deprecation warnings
-      - uses: actions/checkout@v4
-      
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
-          
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install
+
       - name: Run Data Pipeline
         run: node scripts/fetch-data.js
-        
-      - name: Commit and Push Data Updates
+
+      - name: Commit and Push Data
         run: |
-          git config --global user.name "Data Pipeline Bot"
-          git config --global user.email "bot@dedhamdollars.com"
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add public/data/*.json
-          git commit -m "chore: nightly data update from Dedham API" || exit 0
+          git commit -m "Automated weekly data pipeline update" || echo "No changes to commit"
           git push

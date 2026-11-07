@@ -28,10 +28,19 @@ function categorizeFund(fundStr) {
 
 async function fetchSocrata(datasetId, limit, chunks) {
   const results = [];
+  const headers = {
+    'User-Agent': 'DedhamDollars-DataPipeline/1.0',
+    'Accept': 'application/json'
+  };
+  
+  if (process.env.SOCRATA_TOKEN) {
+    headers['X-App-Token'] = process.env.SOCRATA_TOKEN;
+  }
+
   for (let i = 0; i < chunks; i++) {
     const offset = i * limit;
     console.log(`  - Fetching chunk ${i + 1}/${chunks} for ${datasetId}...`);
-    const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`);
+    const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}&$order=fiscalyear DESC`, { headers });
     const data = await response.json();
     if (data.length === 0) break;
     results.push(...data);
@@ -114,7 +123,7 @@ async function runPipeline() {
   fs.writeFileSync(path.join(dataDir, 'checkbook.json'), JSON.stringify(checks));
 
   console.log('Fetching Vendor Profiles...');
-  const rawVendors = await fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.vendors}.json?$limit=50000`).then(res => res.json());
+  const rawVendors = await fetch(`https://${SOCRATA_DOMAIN}/resource/${DATASETS.vendors}.json?$limit=50000`, { headers }).then(res => res.json());
   const vendorProfiles = rawVendors.map(v => ({
     name: v.vendorname || 'Unknown Vendor',
     address: v.address1 || '',

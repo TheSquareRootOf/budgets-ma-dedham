@@ -287,16 +287,16 @@ export default function App() {
     return acc;
   }, {})).filter(item => item.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
 
-  const projectsDonutData = Object.values(searchFilteredProjects.reduce((acc, row) => {
-    if (!acc[row.department]) acc[row.department] = { name: row.department, value: 0 };
-    acc[row.department].value += row.value;
-    return acc;
-  }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
-
   const vendorDonutData = Object.values(searchFilteredCheckbook.reduce((acc, row) => {
     if (!row.vendor || row.vendor === 'Unknown Vendor') return acc;
     if (!acc[row.vendor]) acc[row.vendor] = { name: row.vendor, value: 0 };
     acc[row.vendor].value += row.amount;
+    return acc;
+  }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
+
+  const projectsDonutData = Object.values(searchFilteredProjects.reduce((acc, row) => {
+    if (!acc[row.department]) acc[row.department] = { name: row.department, value: 0 };
+    acc[row.department].value += row.value;
     return acc;
   }, {})).sort((a, b) => b.value - a.value).slice(0, 10);
 
@@ -470,7 +470,7 @@ export default function App() {
     breadcrumbs.push({ id: 'vendor-table', label: 'Vendor Checks', hasResults: selectedAccount && sortedCheckTable.length > 0 });
   } else if (selectedDonut === 'payroll') {
     breadcrumbs.push({ id: 'payroll-table', label: 'Payroll by Category', hasResults: sortedPayrollTable.length > 0 });
-    breadcrumbs.push({ id: 'dynamic-chart', label: 'Payroll Detail', hasResults: selectedEmployee && chartData.length > 0 });
+    breadcrumbs.push({ id: 'employee-chart', label: 'Payroll Detail', hasResults: selectedEmployee && employeeChartData.length > 0 });
   } else if (selectedDonut === 'vendor') {
     breadcrumbs.push({ id: 'master-vendor-table', label: 'Vendor Master List', hasResults: sortedVendorTable.length > 0 });
     breadcrumbs.push({ id: 'dynamic-chart', label: 'Vendor Detail', hasResults: selectedVendor && chartData.length > 0 });
@@ -631,7 +631,6 @@ export default function App() {
                 )}
               </div>
               
-              {/* Inline mobile clear button (hidden on desktop) */}
               {(selectedCategory || selectedAccount || selectedEmployee || selectedVendor || globalSearch) && (
                 <button onClick={fullyReset} className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
                   <FilterX className="w-4 h-4" /> Clear Filters
@@ -1082,7 +1081,7 @@ export default function App() {
                 ) : (
                   <>
                     <div className={`overflow-x-auto w-full border border-slate-200 rounded-xl shadow-inner transition-all duration-300 ${isPayrollExpanded ? 'max-h-[800px]' : 'max-h-[440px]'}`}>
-                      <table className="w-full text-sm text-left min-w-[800px]">
+                      <table className="w-full text-sm text-left min-w-[900px]">
                         <thead className="bg-slate-100 sticky top-0 border-b border-slate-200 shadow-sm z-10">
                           <tr>
                             <th className="px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200" onClick={() => requestPayrollSort('name')}><div className="flex items-center gap-1">Employee Name <ArrowUpDown className="w-3 h-3 text-slate-400" /></div></th>
@@ -1090,6 +1089,7 @@ export default function App() {
                             <th className="px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200" onClick={() => requestPayrollSort('fundType')}><div className="flex items-center gap-1">Source <ArrowUpDown className="w-3 h-3 text-slate-400" /></div></th>
                             <th className="px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200 text-right" onClick={() => requestPayrollSort('basePay')}><div className="flex items-center justify-end gap-1">Base Pay <ArrowUpDown className="w-3 h-3 text-slate-400" /></div></th>
                             <th className="px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200 text-right" onClick={() => requestPayrollSort('overtime')}><div className="flex items-center justify-end gap-1">Overtime <ArrowUpDown className="w-3 h-3 text-slate-400" /></div></th>
+                            <th className="px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200 text-right" onClick={() => requestPayrollSort('otherPay')}><div className="flex items-center justify-end gap-1">Other Pay <ArrowUpDown className="w-3 h-3 text-slate-400" /></div></th>
                             <th className="px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200 text-right" onClick={() => requestPayrollSort('total')}><div className="flex items-center justify-end gap-1">Total Comp. <ArrowUpDown className="w-3 h-3 text-slate-400" /></div></th>
                           </tr>
                         </thead>
@@ -1107,6 +1107,7 @@ export default function App() {
                                 </td>
                                 <td className="px-4 py-3 text-right font-mono text-slate-600">${row.basePay.toLocaleString()}</td>
                                 <td className="px-4 py-3 text-right font-mono text-slate-600">${row.overtime.toLocaleString()}</td>
+                                <td className="px-4 py-3 text-right font-mono text-slate-600">${row.otherPay.toLocaleString()}</td>
                                 <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">${row.total.toLocaleString()}</td>
                               </tr>
                             );
@@ -1114,7 +1115,7 @@ export default function App() {
                           
                           {selectedEmployee && (
                             <tr className="bg-indigo-50/50 border-t border-indigo-200 animate-in fade-in">
-                              <td colSpan="6" className="p-0">
+                              <td colSpan="7" className="p-0">
                                 <button onClick={(e) => { e.stopPropagation(); setSelectedEmployee(null); }} className="w-full py-2.5 flex items-center justify-center gap-2 text-indigo-700 font-bold hover:bg-indigo-100 transition-colors">
                                   <X className="w-4 h-4"/> Return to {selectedCategory === 'ALL' ? 'All Employees' : selectedCategory} List
                                 </button>
@@ -1255,8 +1256,11 @@ export default function App() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {paginatedProjectsTable.map((row, idx) => {
+                            const isSelected = selectedAccount?.date === row.date && selectedAccount?.value === row.value;
+                            const isHidden = selectedAccount && !isSelected;
+                            
                             return (
-                              <tr key={`project-row-${idx}`} className="hover:bg-slate-50 transition-colors">
+                              <tr key={`project-row-${idx}`} onClick={() => { setSelectedAccount(isSelected ? null : row); setCheckPage(1); }} className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-slate-50 border-l-4 border-transparent'} ${isHidden ? 'hidden' : ''}`}>
                                 <td className="px-4 py-4 font-medium text-slate-800">
                                   <div className="flex flex-col">
                                     <span>{row.name}</span>
@@ -1270,10 +1274,20 @@ export default function App() {
                               </tr>
                             );
                           })}
+                          
+                          {selectedAccount && (
+                            <tr className="bg-blue-50/50 border-t border-blue-200 animate-in fade-in">
+                              <td colSpan="4" className="p-0">
+                                <button onClick={(e) => { e.stopPropagation(); setSelectedAccount(null); }} className="w-full py-2.5 flex items-center justify-center gap-2 text-blue-700 font-bold hover:bg-blue-100 transition-colors">
+                                  <X className="w-4 h-4"/> Return to Projects List
+                                </button>
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
-                    <div className="flex-col sm:flex-row justify-between items-center gap-3 mt-4 flex">
+                    <div className={`flex-col sm:flex-row justify-between items-center gap-3 mt-4 ${selectedAccount ? 'hidden' : 'flex'}`}>
                       <span className="text-xs sm:text-sm text-slate-500">Showing {paginatedProjectsTable.length} of {sortedProjectsTable.length} entries</span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setProjectsPage(p => Math.max(1, p - 1))} disabled={projectsPage === 1} className="p-1 sm:p-2 rounded hover:bg-slate-100 disabled:opacity-50"><ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5"/></button>
@@ -1516,7 +1530,7 @@ export default function App() {
       <footer className="mt-12 pt-8 pb-12 border-t border-slate-200 w-full bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-slate-500">
           <div className="text-center md:text-left space-y-1.5">
-            <p className="font-medium text-slate-600">&copy; {new Date().getFullYear()} Dedham Dollars. An independent civic tech initiative.</p>
+            <p className="font-medium text-slate-600">© {new Date().getFullYear()} Dedham Dollars. An independent civic tech initiative.</p>
             <p>Not an official application of the <a href="https://www.dedham-ma.gov" target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 transition-colors font-medium">Town of Dedham</a>.</p>
           </div>
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6 font-medium">
