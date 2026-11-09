@@ -13,15 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
 
       - name: Run Data Pipeline
-        # Grants Node.js 4GB of RAM to handle mapping 500,000 JSON rows
         run: node --max-old-space-size=4096 scripts/fetch-data.js
 
       - name: Commit and Push Data
@@ -30,7 +29,6 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add public/data/*.json
           
-          # Safely checks if there are new updates before trying to commit
           if ! git diff-index --quiet HEAD; then
             git commit -m "Automated weekly data pipeline update"
             git push

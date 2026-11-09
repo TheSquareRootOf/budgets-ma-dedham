@@ -27,7 +27,7 @@ function categorizeFund(fundStr) {
 }
 
 async function fetchSocrata(datasetId, limit, chunks) {
-  const results = [];
+  let results = [];
   const headers = {
     'User-Agent': 'DedhamDollars-DataPipeline/1.0',
     'Accept': 'application/json, text/plain, */*',
@@ -38,7 +38,6 @@ async function fetchSocrata(datasetId, limit, chunks) {
     const offset = i * limit;
     console.log(`  - Fetching chunk ${i + 1}/${chunks} for ${datasetId}...`);
     try {
-      // Removed the sorting parameter to prevent breaking on the Vendor dataset
       const response = await fetch(`https://${SOCRATA_DOMAIN}/resource/${datasetId}.json?$limit=${limit}&$offset=${offset}`, { headers });
       
       if (!response.ok) {
@@ -47,8 +46,11 @@ async function fetchSocrata(datasetId, limit, chunks) {
       }
       
       const data = await response.json();
-      if (data.length === 0) break;
-      results.push(...data);
+      if (!Array.isArray(data) || data.length === 0) break;
+      
+      // Safe merge to prevent "Maximum call stack size exceeded" error
+      results = results.concat(data);
+      
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
       console.error(`  ! Fetch exception:`, err.message);
@@ -82,7 +84,7 @@ async function runPipeline() {
       };
     });
     fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
-    rawBudget = null; budget = null; // Free memory
+    rawBudget = null; budget = null; 
 
     console.log('Fetching Payroll...');
     let rawPayroll = await fetchSocrata(DATASETS.payroll, 50000, 10); 
@@ -100,7 +102,7 @@ async function runPipeline() {
       date: (row.transactiondate || row.checkdate || row.date || '').split('T')[0]
     }));
     fs.writeFileSync(path.join(dataDir, 'payroll.json'), JSON.stringify(payroll));
-    rawPayroll = null; payroll = null; // Free memory
+    rawPayroll = null; payroll = null; 
 
     console.log('Fetching Projects...');
     let rawProjects = await fetchSocrata(DATASETS.projects, 50000, 1);
@@ -116,7 +118,7 @@ async function runPipeline() {
       value: parseFloat(item.actual || 0) 
     }));
     fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
-    rawProjects = null; projects = null; // Free memory
+    rawProjects = null; projects = null; 
 
     console.log('Fetching Checkbook...');
     let rawChecks = await fetchSocrata(DATASETS.checkbook, 50000, 10); 
@@ -134,7 +136,7 @@ async function runPipeline() {
       checkNumber: item.paymentchecknumber || item.checknumber || 'N/A'
     }));
     fs.writeFileSync(path.join(dataDir, 'checkbook.json'), JSON.stringify(checks));
-    rawChecks = null; checks = null; // Free memory
+    rawChecks = null; checks = null; 
 
     console.log('Fetching Vendor Profiles...');
     let rawVendors = await fetchSocrata(DATASETS.vendors, 50000, 1);
@@ -151,7 +153,7 @@ async function runPipeline() {
       isWMBE: String(v.iswomenorminoritybusinessenterprise).toLowerCase() === 'y' || String(v.iswomenorminoritybusinessenterprise).toLowerCase() === 'true'
     }));
     fs.writeFileSync(path.join(dataDir, 'vendors.json'), JSON.stringify(vendorProfiles));
-    rawVendors = null; vendorProfiles = null; // Free memory
+    rawVendors = null; vendorProfiles = null; 
 
     console.log('Data pipeline complete!');
   } catch (error) {
