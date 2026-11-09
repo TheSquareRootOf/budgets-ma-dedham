@@ -26,11 +26,18 @@ function categorizeFund(fundStr) {
   return 'Local Funds';
 }
 
-// Memory-Optimized Fetcher: Formats data on the fly and discards raw JSON immediately
+function saveChunked(dataArray, filenamePrefix, parts, dataDir) {
+  const chunkSize = Math.ceil(dataArray.length / parts);
+  for (let i = 0; i < parts; i++) {
+    const chunk = dataArray.slice(i * chunkSize, (i + 1) * chunkSize);
+    fs.writeFileSync(path.join(dataDir, `${filenamePrefix}-${i + 1}.json`), JSON.stringify(chunk));
+  }
+}
+
 async function fetchAndProcess(datasetId, limit, chunks, mapFn) {
   let results = [];
   const headers = {
-    'User-Agent': 'DedhamDollars-DataPipeline/2.0 (Memory Optimized)',
+    'User-Agent': 'DedhamDollars-DataPipeline/3.0 (Sharded)',
     'Accept': 'application/json'
   };
   
@@ -52,11 +59,9 @@ async function fetchAndProcess(datasetId, limit, chunks, mapFn) {
       const rawData = await response.json();
       if (!Array.isArray(rawData) || rawData.length === 0) break;
       
-      // Map and filter the chunk instantly. The rawData array is garbage collected right after.
       const processedChunk = rawData.map((row, index) => mapFn(row, results.length + index)).filter(item => item !== null);
       results = results.concat(processedChunk);
       
-      // Brief pause to respect Socrata rate limits
       await new Promise(resolve => setTimeout(resolve, 800));
     } catch (err) {
       console.error(`    ! Fetch exception:`, err.message);
@@ -67,7 +72,7 @@ async function fetchAndProcess(datasetId, limit, chunks, mapFn) {
 }
 
 async function runPipeline() {
-  console.log('Starting memory-optimized data pipeline...');
+  console.log('Starting sharded data pipeline...');
   const dataDir = path.join(__dirname, '../public/data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
@@ -90,7 +95,7 @@ async function runPipeline() {
     });
     fs.writeFileSync(path.join(dataDir, 'budget.json'), JSON.stringify(budget));
 
-    console.log('\n📦 Fetching Payroll...');
+    console.log('\n📦 Fetching Payroll (Splitting into 4 parts)...');
     const payroll = await fetchAndProcess(DATASETS.payroll, 50000, 10, (row, id) => ({
       id, 
       fiscalYear: row.fiscalyear || '2027',
@@ -104,11 +109,10 @@ async function runPipeline() {
       total: parseFloat(row.totalpay || 0),
       date: (row.transactiondate || row.checkdate || row.date || '').split('T')[0]
     }));
-    fs.writeFileSync(path.join(dataDir, 'payroll.json'), JSON.stringify(payroll));
+    saveChunked(payroll, 'payroll', 4, dataDir);
 
     console.log('\n📦 Fetching Projects & Major Expenditures...');
     const projects = await fetchAndProcess(DATASETS.projects, 50000, 1, (item, id) => {
-      // Drop minor expenditures instantly to save memory
       if (parseFloat(item.actual || 0) <= 25000) return null; 
       return {
         id,
@@ -124,7 +128,7 @@ async function runPipeline() {
     });
     fs.writeFileSync(path.join(dataDir, 'projects.json'), JSON.stringify(projects));
 
-    console.log('\n📦 Fetching Checkbook (Large Dataset)...');
+    console.log('\n📦 Fetching Checkbook (Splitting into 4 parts)...');
     const checks = await fetchAndProcess(DATASETS.checkbook, 50000, 10, (item, id) => ({
       id,
       fiscalYear: item.fiscalyear || '2027',
@@ -138,7 +142,7 @@ async function runPipeline() {
       date: (item.date || '').split('T')[0],
       checkNumber: item.paymentchecknumber || item.checknumber || 'N/A'
     }));
-    fs.writeFileSync(path.join(dataDir, 'checkbook.json'), JSON.stringify(checks));
+    saveChunked(checks, 'checkbook', 4, dataDir);
 
     console.log('\n📦 Fetching Vendor Profiles...');
     const vendorProfiles = await fetchAndProcess(DATASETS.vendors, 50000, 1, (v) => ({
@@ -159,7 +163,6 @@ async function runPipeline() {
     process.exit(0);
   } catch (error) {
     console.error('\n❌ PIPELINE HALTED:', error.message);
-    // Exiting 0 prevents the workflow from showing a failed status and keeps the site online
     process.exit(0);
   }
 }
