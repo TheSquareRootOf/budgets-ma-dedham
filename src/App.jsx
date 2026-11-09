@@ -268,7 +268,14 @@ export default function App() {
   const spendPercentage = totalGlobalBudget > 0 ? (totalGlobalSpend / totalGlobalBudget) * 100 : 0;
   const spendColor = totalGlobalSpend > totalGlobalBudget ? 'bg-red-500' : 'bg-emerald-500';
 
-  const formatCurrency = (value) => `$${value.toLocaleString()}`;
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   const budgetDonutData = Object.values(nonPayrollBudget.reduce((acc, row) => {
     if (!acc[row.department]) acc[row.department] = { name: row.department, budget: 0, spend: 0 };
@@ -470,7 +477,7 @@ export default function App() {
     breadcrumbs.push({ id: 'vendor-table', label: 'Vendor Checks', hasResults: selectedAccount && sortedCheckTable.length > 0 });
   } else if (selectedDonut === 'payroll') {
     breadcrumbs.push({ id: 'payroll-table', label: 'Payroll by Category', hasResults: sortedPayrollTable.length > 0 });
-    breadcrumbs.push({ id: 'employee-chart', label: 'Payroll Detail', hasResults: selectedEmployee && employeeChartData.length > 0 });
+    breadcrumbs.push({ id: 'employee-chart', label: 'Payroll Detail', hasResults: selectedEmployee && chartData.length > 0 });
   } else if (selectedDonut === 'vendor') {
     breadcrumbs.push({ id: 'master-vendor-table', label: 'Vendor Master List', hasResults: sortedVendorTable.length > 0 });
     breadcrumbs.push({ id: 'dynamic-chart', label: 'Vendor Detail', hasResults: selectedVendor && chartData.length > 0 });
@@ -631,6 +638,7 @@ export default function App() {
                 )}
               </div>
               
+              {/* Inline mobile clear button (hidden on desktop) */}
               {(selectedCategory || selectedAccount || selectedEmployee || selectedVendor || globalSearch) && (
                 <button onClick={fullyReset} className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-200 shadow-sm shrink-0">
                   <FilterX className="w-4 h-4" /> Clear Filters
@@ -1006,10 +1014,10 @@ export default function App() {
                                 <td className="px-4 py-4">
                                   <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
                                 </td>
-                                <td className="px-4 py-4 text-right font-mono text-slate-500">${row.budget.toLocaleString()}</td>
+                                <td className="px-4 py-4 text-right font-mono text-slate-500">{formatCurrency(row.budget)}</td>
                                 <td className="px-4 py-4 text-right">
                                   <div className="flex flex-col items-end gap-1.5">
-                                    <span className="font-mono font-medium text-slate-800">${row.spend.toLocaleString()}</span>
+                                    <span className="font-mono font-medium text-slate-800">{formatCurrency(row.spend)}</span>
                                     <div className="flex items-center gap-2 w-28">
                                       <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                         <div className={`h-full ${pct > 100 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(pct, 100)}%` }}></div>
@@ -1105,10 +1113,10 @@ export default function App() {
                                 <td className="px-4 py-3">
                                   <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
                                 </td>
-                                <td className="px-4 py-3 text-right font-mono text-slate-600">${row.basePay.toLocaleString()}</td>
-                                <td className="px-4 py-3 text-right font-mono text-slate-600">${row.overtime.toLocaleString()}</td>
-                                <td className="px-4 py-3 text-right font-mono text-slate-600">${row.otherPay.toLocaleString()}</td>
-                                <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">${row.total.toLocaleString()}</td>
+                                <td className="px-4 py-3 text-right font-mono text-slate-600">{formatCurrency(row.basePay)}</td>
+                                <td className="px-4 py-3 text-right font-mono text-slate-600">{formatCurrency(row.overtime)}</td>
+                                <td className="px-4 py-3 text-right font-mono text-slate-600">{formatCurrency(row.otherPay)}</td>
+                                <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">{formatCurrency(row.total)}</td>
                               </tr>
                             );
                           })}
@@ -1189,7 +1197,7 @@ export default function App() {
                               <tr key={`vendor-row-${idx}`} onClick={() => setSelectedVendor(isSelected ? null : row)} className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-slate-50 border-l-4 border-transparent'} ${isHidden ? 'hidden' : ''}`}>
                                 <td className="px-4 py-4 font-bold text-slate-800">{row.name}</td>
                                 <td className="px-4 py-4 text-right font-mono text-slate-600">{row.count}</td>
-                                <td className="px-4 py-4 text-right font-mono font-bold text-slate-800">${row.total.toLocaleString()}</td>
+                                <td className="px-4 py-4 text-right font-mono font-bold text-slate-800">{formatCurrency(row.total)}</td>
                               </tr>
                             );
                           })}
@@ -1270,7 +1278,7 @@ export default function App() {
                                 <td className="px-4 py-4">
                                   <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md whitespace-nowrap ${row.fundType === 'Local Funds' ? 'bg-slate-200 text-slate-600' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>{row.fundType}</span>
                                 </td>
-                                <td className="px-4 py-4 text-right font-mono font-medium text-slate-800">${row.value.toLocaleString()}</td>
+                                <td className="px-4 py-4 text-right font-mono font-medium text-slate-800">{formatCurrency(row.value)}</td>
                               </tr>
                             );
                           })}
@@ -1401,8 +1409,8 @@ export default function App() {
                         <BarChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                           <XAxis dataKey="fiscalYear" stroke="#94a3b8" tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                          <YAxis stroke="#94a3b8" tick={{fill: '#94a3b8', fontSize: 11}} tickFormatter={(val) => `$${(val/1000)}k`} />
-                          <Tooltip cursor={{fill: '#1e293b'}} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '0.5rem', color: '#f8fafc' }} formatter={(value) => [`$${value.toLocaleString()}`, selectedEmployee ? 'Total Comp' : 'Total Spend']} labelStyle={{ color: '#94a3b8', marginBottom: '4px' }} labelFormatter={(label) => `FY: ${label}`} wrapperStyle={{ pointerEvents: 'none' }} />
+                          <YAxis stroke="#94a3b8" tick={{fill: '#94a3b8', fontSize: 11}} tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} />
+                          <Tooltip cursor={{fill: '#1e293b'}} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '0.5rem', color: '#f8fafc' }} formatter={(value) => [formatCurrency(value), selectedEmployee ? 'Total Comp' : 'Total Spend']} labelStyle={{ color: '#94a3b8', marginBottom: '4px' }} labelFormatter={(label) => `FY: ${label}`} wrapperStyle={{ pointerEvents: 'none' }} />
                           <Bar dataKey="value" fill={selectedEmployee ? "#818cf8" : "#38bdf8"} radius={[4, 4, 0, 0]} maxBarSize={60} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -1503,7 +1511,7 @@ export default function App() {
 
                               <td className="px-4 py-3 text-slate-400 truncate max-w-[200px]" title={check.description}>{check.description}</td>
                               <td className="px-4 py-3 text-slate-500 font-mono text-xs">{check.checkNumber}</td>
-                              <td className="px-4 py-3 text-right font-mono font-medium text-emerald-400">${check.amount.toLocaleString()}</td>
+                              <td className="px-4 py-3 text-right font-mono font-medium text-emerald-400">{formatCurrency(check.amount)}</td>
                             </tr>
                           ))}
                         </tbody>
