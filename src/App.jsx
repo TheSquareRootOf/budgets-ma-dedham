@@ -50,6 +50,36 @@ const downloadCSV = (data, columns, filename) => {
   link.click();
 };
 
+// Vendor Profiling Engine (Infers description based on their actual check history)
+const getVendorDescription = (vendorName, checks) => {
+  const nameLower = vendorName.toLowerCase();
+  if (nameLower.includes('town of') || nameLower === 'dedham' || nameLower.includes('dedham public') || nameLower.includes('treasurer')) {
+    return "Internal municipal account, trust, or local government entity.";
+  }
+  if (!checks || checks.length === 0) return "Registered municipal vendor.";
+
+  const depts = [...new Set(checks.map(c => c.department))].filter(d => d && d !== 'General Government');
+  let deptStr = 'General Government';
+  if (depts.length === 1) deptStr = depts[0];
+  else if (depts.length === 2) deptStr = `${depts[0]} and ${depts[1]}`;
+  else if (depts.length > 2) deptStr = `${depts[0]}, ${depts[1]}, and multiple other departments`;
+
+  const descCounts = {};
+  checks.forEach(c => {
+    let desc = (c.accountDescription || 'general operations').trim().toLowerCase();
+    if (desc === 'uncategorized expense' && c.description) desc = c.description.trim().toLowerCase();
+    descCounts[desc] = (descCounts[desc] || 0) + 1;
+  });
+  const topDescs = Object.entries(descCounts).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  
+  let svcStr = topDescs[0];
+  if (topDescs.length > 1 && topDescs[1] !== topDescs[0]) {
+    svcStr = `${svcStr} and ${topDescs[1]}`;
+  }
+
+  return `Provides ${svcStr}, primarily interacting with ${deptStr}.`;
+};
+
 export default function App() {
   const [rawBudget, setRawBudget] = useState([]);
   const [rawPayroll, setRawPayroll] = useState([]);
@@ -1391,13 +1421,16 @@ export default function App() {
                 {selectedVendor && activeVendorProfile && (
                   <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6">
                     <div className="flex-1 space-y-4">
-                       <div className="flex items-center gap-3">
+                       <div className="flex items-start gap-3">
                          <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0">
                            <Store className="w-5 h-5" />
                          </div>
                          <div>
                            <h3 className="text-lg font-bold text-slate-800">{activeVendorProfile.name}</h3>
-                           <div className="flex flex-wrap gap-2 mt-1">
+                           <p className="text-sm text-slate-500 mt-0.5 leading-relaxed pr-4">
+                             {getVendorDescription(activeVendorProfile.name, rawCheckbook.filter(c => c.vendor === activeVendorProfile.name))}
+                           </p>
+                           <div className="flex flex-wrap gap-2 mt-2">
                              {activeVendorProfile.city.toLowerCase() === 'dedham' && (
                                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1"><MapPin className="w-3 h-3"/> Local Business</span>
                              )}
