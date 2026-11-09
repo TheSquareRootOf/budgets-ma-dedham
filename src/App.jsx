@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, FilterX, Table2, ArrowUpDown, CalendarDays, 
   ChevronRight, ChevronLeft, Maximize2, Minimize2, X, ChevronDown, Check, Minus, TrendingUp, Calendar,
-  Loader2, Info, ShieldAlert, HelpCircle, Zap, TrendingDown, DollarSign, CalendarClock, MapPin, Globe, PhoneCall, UserCircle, BadgeCheck, Store
+  Loader2, Info, ShieldAlert, HelpCircle, Zap, TrendingDown, DollarSign, CalendarClock, MapPin, Globe, PhoneCall, UserCircle, BadgeCheck, Store, Download
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
@@ -31,6 +31,25 @@ const TownSealLogo = ({ className }) => (
   </svg>
 );
 
+// CSV Generator Engine
+const downloadCSV = (data, columns, filename) => {
+  if (data.length === 0) return;
+  const headers = columns.map(c => c.label).join(',');
+  const rows = data.map(row => columns.map(c => {
+    let val = c.format ? c.format(row) : row[c.key];
+    if (val === null || val === undefined) val = '';
+    if (typeof val === 'string') return `"${val.replace(/"/g, '""')}"`;
+    return val;
+  }).join(','));
+  const csv = [headers, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename}.csv`;
+  link.click();
+};
+
 export default function App() {
   const [rawBudget, setRawBudget] = useState([]);
   const [rawPayroll, setRawPayroll] = useState([]);
@@ -44,6 +63,7 @@ export default function App() {
   const [fundFilter, setFundFilter] = useState('All'); 
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState('');
   
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showInsights, setShowInsights] = useState(true);
@@ -94,6 +114,15 @@ export default function App() {
 
   useEffect(() => {
     async function loadData() {
+      // Fetch Header metadata to determine exact database sync time
+      fetch('/data/budget.json', { method: 'HEAD' })
+        .then(res => {
+          const lastMod = res.headers.get('last-modified');
+          if (lastMod) {
+            setLastRefreshed(new Date(lastMod).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+          }
+        }).catch(() => {});
+
       const [budget, payroll, projects, vendors, profiles] = await Promise.all([
         fetchOperatingBudget(), fetchPayrollData(), fetchCapitalProjects(), fetchVendorCheckbook(), fetchVendorProfiles()
       ]);
@@ -136,6 +165,7 @@ export default function App() {
 
   const fullyReset = () => {
     setGlobalSearch('');
+    setFundFilter('All');
     setSelectedDonut(null);
     setSelectedCategory(null);
     setSelectedAccount(null);
@@ -265,7 +295,7 @@ export default function App() {
 
   const totalGlobalBudget = nonPayrollBudget.reduce((sum, item) => sum + item.budget, 0);
   const totalGlobalSpend = nonPayrollBudget.reduce((sum, item) => sum + item.spend, 0);
-  const spendPercentage = totalGlobalBudget > 0 ? (totalGlobalSpend / totalGlobalBudget) * 100 : 0;
+  const spendPercentage = totalGlobalBudget > 0 ? ((totalGlobalSpend / totalGlobalBudget) * 100).toFixed(1) : 0;
   const spendColor = totalGlobalSpend > totalGlobalBudget ? 'bg-red-500' : 'bg-emerald-500';
 
   const formatCurrency = (value) => {
@@ -275,6 +305,12 @@ export default function App() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(value);
+  };
+  
+  const formatLargeCurrency = (value) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
+    return formatCurrency(value);
   };
 
   const budgetDonutData = Object.values(nonPayrollBudget.reduce((acc, row) => {
@@ -477,7 +513,7 @@ export default function App() {
     breadcrumbs.push({ id: 'vendor-table', label: 'Vendor Checks', hasResults: selectedAccount && sortedCheckTable.length > 0 });
   } else if (selectedDonut === 'payroll') {
     breadcrumbs.push({ id: 'payroll-table', label: 'Payroll by Category', hasResults: sortedPayrollTable.length > 0 });
-    breadcrumbs.push({ id: 'employee-chart', label: 'Payroll Detail', hasResults: selectedEmployee && chartData.length > 0 });
+    breadcrumbs.push({ id: 'dynamic-chart', label: 'Payroll Detail', hasResults: selectedEmployee && chartData.length > 0 });
   } else if (selectedDonut === 'vendor') {
     breadcrumbs.push({ id: 'master-vendor-table', label: 'Vendor Master List', hasResults: sortedVendorTable.length > 0 });
     breadcrumbs.push({ id: 'dynamic-chart', label: 'Vendor Detail', hasResults: selectedVendor && chartData.length > 0 });
@@ -547,10 +583,10 @@ export default function App() {
             <button onClick={() => setShowDisclaimerModal(true)} className="text-slate-500 hover:text-amber-600 transition-colors">Disclaimer</button>
           </div>
 
-          <div className="flex items-center gap-4 mb-6 pt-2">
+          <div className="flex items-center gap-4 mb-6 pt-2 cursor-pointer group w-fit" onClick={fullyReset}>
             <TownSealLogo className="w-10 h-10 sm:w-12 sm:h-12 drop-shadow-sm shrink-0" />
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dedham Dollars</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight group-hover:text-blue-600 transition-colors">Dedham Dollars</h1>
               <p className="text-slate-500 text-xs sm:text-sm">Making Our Town Finances Easier To Understand</p>
             </div>
           </div>
@@ -561,7 +597,7 @@ export default function App() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-semibold text-slate-700">Approved Budget</span>
-                  <span className="font-bold text-blue-600">{formatCurrency(totalGlobalBudget)}</span>
+                  <span className="font-bold text-blue-600">{formatLargeCurrency(totalGlobalBudget)}</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-3 sm:h-4 overflow-hidden border border-slate-200">
                   <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: '100%' }}></div>
@@ -570,12 +606,20 @@ export default function App() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-semibold text-slate-700">Funds Spent</span>
-                  <span className={`font-bold ${totalGlobalSpend > totalGlobalBudget ? 'text-red-600' : 'text-emerald-600'}`}>{formatCurrency(totalGlobalSpend)}</span>
+                  <span className={`font-bold flex items-center ${totalGlobalSpend > totalGlobalBudget ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {formatLargeCurrency(totalGlobalSpend)}
+                    <span className="text-slate-500 ml-1 text-xs font-semibold">({spendPercentage}%)</span>
+                  </span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-3 sm:h-4 overflow-hidden border border-slate-200">
                   <div className={`${spendColor} h-full rounded-full transition-all duration-500`} style={{ width: `${Math.min(spendPercentage, 100)}%` }}></div>
                 </div>
               </div>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-center sm:justify-start gap-1.5 text-xs text-slate-500">
+              <CalendarClock className="w-4 h-4 shrink-0" />
+              <span>Data last updated: <strong className="text-slate-700">{lastRefreshed || 'Recently'}</strong>. Refreshes weekly on Sundays.</span>
             </div>
           </div>
 
@@ -731,7 +775,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                <div className="w-full mt-4 flex flex-col gap-2 animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {top10Budget.slice(0, 5).map((entry, index) => {
                     const isSelected = selectedCategory === entry.name && selectedDonut === 'budget';
@@ -745,7 +789,7 @@ export default function App() {
                           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
                           <span className="truncate">{entry.name}</span>
                         </div>
-                        <span className="shrink-0">{formatCurrency(entry.spend)}</span>
+                        <span className="shrink-0">{formatLargeCurrency(entry.spend)}</span>
                       </button>
                     )
                   })}
@@ -779,7 +823,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                <div className="w-full mt-4 flex flex-col gap-2 animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {payrollDonutData.slice(0, 5).map((entry, index) => {
                     const isSelected = selectedCategory === entry.name && selectedDonut === 'payroll';
@@ -793,7 +837,7 @@ export default function App() {
                           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 1) % COLORS.length] }}></div>
                           <span className="truncate">{entry.name}</span>
                         </div>
-                        <span className="shrink-0">{formatCurrency(entry.total)}</span>
+                        <span className="shrink-0">{formatLargeCurrency(entry.total)}</span>
                       </button>
                     )
                   })}
@@ -827,7 +871,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in">
+                <div className="w-full mt-4 flex flex-col gap-2 animate-in fade-in">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {vendorDonutData.slice(0, 5).map((entry, index) => {
                     const isSelected = selectedCategory === 'ALL' && selectedDonut === 'vendor' && selectedVendor?.name === entry.name;
@@ -841,7 +885,7 @@ export default function App() {
                           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 2) % COLORS.length] }}></div>
                           <span className="truncate">{entry.name}</span>
                         </div>
-                        <span className="shrink-0">{formatCurrency(entry.value)}</span>
+                        <span className="shrink-0">{formatLargeCurrency(entry.value)}</span>
                       </button>
                     )
                   })}
@@ -875,7 +919,7 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                <div className="w-full mt-4 flex flex-col gap-2 sm:hidden animate-in fade-in opacity-80">
+                <div className="w-full mt-4 flex flex-col gap-2 animate-in fade-in opacity-80">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center mb-1">Tap below to explore</p>
                   {projectsDonutData.slice(0, 5).map((entry, index) => {
                     const isSelected = selectedCategory === entry.name && selectedDonut === 'projects';
@@ -889,7 +933,7 @@ export default function App() {
                           <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[(index + 3) % COLORS.length] }}></div>
                           <span className="truncate">{entry.name}</span>
                         </div>
-                        <span className="shrink-0">{formatCurrency(entry.value)}</span>
+                        <span className="shrink-0">{formatLargeCurrency(entry.value)}</span>
                       </button>
                     )
                   })}
@@ -977,9 +1021,16 @@ export default function App() {
                           className="w-full pl-8 pr-3 py-2 sm:py-1.5 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <button onClick={() => setIsBudgetExpanded(!isBudgetExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
-                        {isBudgetExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadCSV(sortedBudgetTable, [
+                          {label: 'Expense Description', key: 'description'}, {label: 'Source', key: 'fundType'}, {label: 'Budgeted', key: 'budget'}, {label: 'Spent', key: 'spend'}, {label: 'Variance', format: r => r.spend - r.budget}
+                        ], `Dedham_Budget_FY${selectedYear}`)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors">
+                          <Download className="w-4 h-4"/> CSV
+                        </button>
+                        <button onClick={() => setIsBudgetExpanded(!isBudgetExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors ml-2">
+                          {isBudgetExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1018,12 +1069,17 @@ export default function App() {
                                 <td className="px-4 py-4 text-right">
                                   <div className="flex flex-col items-end gap-1.5">
                                     <span className="font-mono font-medium text-slate-800">{formatCurrency(row.spend)}</span>
-                                    <div className="flex items-center gap-2 w-28">
+                                    <div className="flex items-center gap-2 w-full max-w-[140px]">
                                       <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                         <div className={`h-full ${pct > 100 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(pct, 100)}%` }}></div>
                                       </div>
-                                      <span className={`text-[10px] font-bold w-9 text-right ${pct > 100 ? 'text-red-600' : 'text-slate-500'}`}>{pct}%</span>
+                                      <span className={`text-[10px] font-bold w-14 text-right ${pct > 100 ? 'text-red-600' : 'text-slate-500'}`}>{pct}% spent</span>
                                     </div>
+                                    {pct > 100 && (
+                                      <span className="text-[10px] text-red-600 font-semibold bg-red-50 border border-red-100 px-1.5 py-0.5 rounded mt-0.5">
+                                        +{formatCurrency(row.spend - row.budget)} over
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -1077,9 +1133,16 @@ export default function App() {
                           className="w-full pl-8 pr-3 py-2 sm:py-1.5 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <button onClick={() => setIsPayrollExpanded(!isPayrollExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800">
-                        {isPayrollExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadCSV(sortedPayrollTable, [
+                          {label: 'Employee Name', key: 'name'}, {label: 'Job Title', key: 'position'}, {label: 'Source', key: 'fundType'}, {label: 'Base Pay', key: 'basePay'}, {label: 'Overtime', key: 'overtime'}, {label: 'Other Pay', key: 'otherPay'}, {label: 'Total Comp', key: 'total'}
+                        ], `Dedham_Payroll_FY${selectedYear}`)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors">
+                          <Download className="w-4 h-4"/> CSV
+                        </button>
+                        <button onClick={() => setIsPayrollExpanded(!isPayrollExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 ml-2">
+                          {isPayrollExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1168,9 +1231,16 @@ export default function App() {
                           className="w-full pl-8 pr-3 py-2 sm:py-1.5 text-sm rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <button onClick={() => setIsVendorExpanded(!isVendorExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800">
-                        {isVendorExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadCSV(sortedVendorTable, [
+                          {label: 'Vendor Name', key: 'name'}, {label: 'Total Checks', key: 'count'}, {label: 'Total Spend', key: 'total'}
+                        ], `Dedham_Vendors_FY${selectedYear}`)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors">
+                          <Download className="w-4 h-4"/> CSV
+                        </button>
+                        <button onClick={() => setIsVendorExpanded(!isVendorExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 ml-2">
+                          {isVendorExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1241,7 +1311,12 @@ export default function App() {
                   
                   {!selectedAccount && (
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                      <button onClick={() => setIsProjectsExpanded(!isProjectsExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                      <button onClick={() => downloadCSV(sortedProjectsTable, [
+                        {label: 'Project Description', key: 'name'}, {label: 'Department', key: 'department'}, {label: 'Source', key: 'fundType'}, {label: 'Amount', key: 'value'}
+                      ], `Dedham_Major_Expenditures_FY${selectedYear}`)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors">
+                        <Download className="w-4 h-4"/> CSV
+                      </button>
+                      <button onClick={() => setIsProjectsExpanded(!isProjectsExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors ml-2">
                         {isProjectsExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
                       </button>
                     </div>
@@ -1436,8 +1511,13 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <button onClick={() => setIsCheckExpanded(!isCheckExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-400 hover:text-blue-300">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => downloadCSV(sortedCheckTable, [
+                      {label: 'Date', key: 'date'}, {label: 'Vendor', key: 'vendor'}, {label: 'Description', key: 'description'}, {label: 'Check #', key: 'checkNumber'}, {label: 'Amount', key: 'amount'}
+                    ], `Dedham_Checks_${selectedDonut === 'vendor' ? selectedVendor.name : 'Budget'}`)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-slate-400 hover:text-blue-400 transition-colors">
+                      <Download className="w-4 h-4"/> CSV
+                    </button>
+                    <button onClick={() => setIsCheckExpanded(!isCheckExpanded)} className="hidden sm:flex items-center gap-1 text-sm font-semibold text-blue-400 hover:text-blue-300 ml-2">
                       {isCheckExpanded ? <><Minimize2 className="w-4 h-4"/> Collapse</> : <><Maximize2 className="w-4 h-4"/> Expand</>}
                     </button>
                   </div>
